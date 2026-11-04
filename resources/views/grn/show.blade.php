@@ -69,17 +69,50 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @foreach($grn->items as $item)
+                    @php
+                        $uom = $item->product->base_uom ?? 'Tablet';
+                        $isPack = ($item->purchase_uom === 'pack' && ($item->units_per_pack ?? 1) > 1);
+                    @endphp
                     <tr>
                         <td class="py-3 px-3">
                             <span class="font-bold text-slate-900">{{ $item->product->brand_name }}</span>
                             <span class="text-[11px] text-slate-500 block italic">{{ $item->product->generic_name }}</span>
+                            @if($isPack)
+                            <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono font-bold text-[10px]">
+                                Received in Packs (1 Pack = {{ $item->units_per_pack }} {{ $uom }})
+                            </span>
+                            @endif
                         </td>
                         <td class="py-3 px-3 font-mono font-bold text-slate-800">{{ $item->batch_number }}</td>
                         <td class="py-3 px-3 font-mono">{{ $item->expiry_date->format('d/m/Y') }}</td>
-                        <td class="py-3 px-3 text-center font-mono font-bold">{{ $item->quantity_received }}</td>
-                        <td class="py-3 px-3 text-center font-mono text-emerald-700">+{{ $item->free_bonus_qty }}</td>
-                        <td class="py-3 px-3 text-right font-mono">Rs. {{ number_format($item->cost_price, 2) }}</td>
-                        <td class="py-3 px-3 text-right font-mono font-bold text-slate-900">Rs. {{ number_format($item->retail_price, 2) }}</td>
+                        <td class="py-3 px-3 text-center font-mono">
+                            @if($isPack && $item->packs_received)
+                                <div class="font-bold text-indigo-800">{{ $item->packs_received }} Packs</div>
+                                <div class="text-[10px] text-emerald-700 font-semibold">({{ $item->quantity_received }} {{ $uom }})</div>
+                            @else
+                                <div class="font-bold">{{ $item->quantity_received }} {{ $uom }}</div>
+                            @endif
+                        </td>
+                        <td class="py-3 px-3 text-center font-mono text-emerald-700">
+                            @if($isPack && ($item->bonus_packs ?? 0) > 0)
+                                <div class="font-bold">+{{ $item->bonus_packs }} Packs</div>
+                                <div class="text-[10px]">(+{{ $item->free_bonus_qty }} {{ $uom }})</div>
+                            @else
+                                +{{ $item->free_bonus_qty }} {{ $uom }}
+                            @endif
+                        </td>
+                        <td class="py-3 px-3 text-right font-mono">
+                            <div class="font-bold text-slate-800">Rs. {{ number_format($item->cost_price, 2) }} <span class="text-[10px] font-normal text-slate-500">/{{ $uom }}</span></div>
+                            @if($isPack && $item->pack_cost_price)
+                                <div class="text-[10px] text-indigo-600">Pack: Rs. {{ number_format($item->pack_cost_price, 2) }}</div>
+                            @endif
+                        </td>
+                        <td class="py-3 px-3 text-right font-mono">
+                            <div class="font-bold text-emerald-800">Rs. {{ number_format($item->retail_price, 2) }} <span class="text-[10px] font-normal text-slate-500">/{{ $uom }}</span></div>
+                            @if($isPack && $item->pack_retail_price)
+                                <div class="text-[10px] text-indigo-600">Pack: Rs. {{ number_format($item->pack_retail_price, 2) }}</div>
+                            @endif
+                        </td>
                         <td class="py-3 px-3 text-right font-mono font-bold text-slate-900">Rs. {{ number_format($item->subtotal, 2) }}</td>
                     </tr>
                     @endforeach

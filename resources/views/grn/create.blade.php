@@ -78,21 +78,23 @@
                 <table class="w-full text-left text-xs border-collapse">
                     <thead class="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider">
                         <tr>
-                            <th class="py-2.5 px-3" style="width: 25%;">Drug / Medication *</th>
-                            <th class="py-2.5 px-3" style="width: 14%;">Batch No *</th>
-                            <th class="py-2.5 px-3" style="width: 13%;">Expiry Date *</th>
-                            <th class="py-2.5 px-3 text-center" style="width: 10%;">Recv Qty *</th>
-                            <th class="py-2.5 px-3 text-center" style="width: 9%;">Bonus Qty</th>
-                            <th class="py-2.5 px-3 text-right" style="width: 12%;">Cost (Rs.) *</th>
-                            <th class="py-2.5 px-3 text-right" style="width: 12%;">Retail (Rs.) *</th>
-                            <th class="py-2.5 px-3 text-right" style="width: 12%;">Subtotal (Rs.)</th>
-                            <th class="py-2.5 px-2 text-center" style="width: 5%;"></th>
+                            <th class="py-2.5 px-2" style="width: 21%;">Drug / Medication *</th>
+                            <th class="py-2.5 px-2" style="width: 14%;">UOM / Pack Size *</th>
+                            <th class="py-2.5 px-2" style="width: 11%;">Batch No *</th>
+                            <th class="py-2.5 px-2" style="width: 11%;">Expiry Date *</th>
+                            <th class="py-2.5 px-2 text-center" style="width: 9%;">Recv Qty *</th>
+                            <th class="py-2.5 px-2 text-center" style="width: 8%;">Bonus Qty</th>
+                            <th class="py-2.5 px-2 text-right" style="width: 11%;">Cost (Rs.) *</th>
+                            <th class="py-2.5 px-2 text-right" style="width: 11%;">Retail (Rs.) *</th>
+                            <th class="py-2.5 px-2 text-right" style="width: 10%;">Subtotal (Rs.)</th>
+                            <th class="py-2.5 px-1 text-center" style="width: 4%;"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         <template x-for="(line, index) in lines" :key="index">
-                            <tr class="hover:bg-slate-50/60 transition-colors">
-                                <td class="py-2 px-2">
+                            <tr class="hover:bg-slate-50/60 transition-colors align-top">
+                                <!-- Drug Select -->
+                                <td class="py-2.5 px-2">
                                     <select :name="'items[' + index + '][product_id]'" 
                                             x-model="line.product_id"
                                             @change="onProductSelect(index)"
@@ -100,46 +102,163 @@
                                             class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-emerald-500">
                                         <option value="">-- Select Drug --</option>
                                         @foreach($products as $p)
-                                        <option value="{{ $p->id }}" data-cost="{{ $p->unit_cost_price }}" data-retail="{{ $p->unit_retail_price }}">
+                                        <option value="{{ $p->id }}"
+                                                data-cost="{{ $p->unit_cost_price }}"
+                                                data-retail="{{ $p->unit_retail_price }}"
+                                                data-uom="{{ $p->base_uom ?? 'Tablet' }}"
+                                                data-pack="{{ $p->units_per_pack ?? 1 }}">
                                             {{ $p->brand_name }} ({{ $p->dosage_strength }})
                                         </option>
                                         @endforeach
                                     </select>
                                 </td>
-                                <td class="py-2 px-2">
+
+                                <!-- UOM Mode (Unit/Tablet vs Pack) & Pack Size -->
+                                <td class="py-2.5 px-2">
+                                    <select :name="'items[' + index + '][purchase_uom]'"
+                                            x-model="line.purchase_uom"
+                                            @change="onUomChange(index)"
+                                            class="w-full px-2 py-1.5 border rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-500"
+                                            :class="line.purchase_uom === 'pack' ? 'bg-indigo-50 border-indigo-300 text-indigo-800' : 'bg-white border-slate-300 text-slate-700'">
+                                        <option value="unit" x-text="(line.base_uom || 'Tablet') + ' (Single)'"></option>
+                                        <option value="pack" x-text="'Pack → ' + (line.base_uom || 'Tablets')"></option>
+                                    </select>
+
+                                    <template x-if="line.purchase_uom === 'pack'">
+                                        <div class="mt-1.5 flex items-center gap-1 bg-indigo-50/80 px-2 py-1 rounded-lg border border-indigo-200 text-[10px]">
+                                            <span class="font-semibold text-indigo-700 whitespace-nowrap">1 Pack =</span>
+                                            <input type="number"
+                                                   min="1"
+                                                   :name="'items[' + index + '][units_per_pack]'"
+                                                   x-model.number="line.units_per_pack"
+                                                   @input="onPackSizeChange(index)"
+                                                   required
+                                                   class="w-14 px-1 py-0.5 bg-white border border-indigo-300 rounded text-center font-mono font-bold text-indigo-900 text-[11px]">
+                                            <span class="font-semibold text-indigo-700 truncate" x-text="line.base_uom || 'Tab'"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="line.purchase_uom !== 'pack'">
+                                        <input type="hidden" :name="'items[' + index + '][units_per_pack]'" value="1">
+                                    </template>
+                                </td>
+
+                                <!-- Batch Number -->
+                                <td class="py-2.5 px-2">
                                     <input type="text" :name="'items[' + index + '][batch_number]'" 
                                            x-model="line.batch_number" required placeholder="e.g. B-1092"
                                            class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg font-mono text-xs focus:ring-1 focus:ring-emerald-500">
                                 </td>
-                                <td class="py-2 px-2">
+
+                                <!-- Expiry Date -->
+                                <td class="py-2.5 px-2">
                                     <input type="date" :name="'items[' + index + '][expiry_date]'" 
                                            x-model="line.expiry_date" required min="{{ date('Y-m-d') }}"
                                            class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:ring-1 focus:ring-emerald-500">
                                 </td>
-                                <td class="py-2 px-2 text-center">
-                                    <input type="number" min="1" :name="'items[' + index + '][quantity_received]'" 
-                                           x-model.number="line.quantity_received" required
-                                           class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-center font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500">
+
+                                <!-- Recv Qty -->
+                                <td class="py-2.5 px-2 text-center">
+                                    <div class="relative">
+                                        <input type="number" min="1" :name="'items[' + index + '][quantity_received]'" 
+                                               x-model.number="line.quantity_received" required
+                                               class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-center font-mono font-bold text-xs focus:ring-1 focus:ring-emerald-500">
+                                    </div>
+                                    <span class="block text-[10px] text-slate-400 font-semibold mt-0.5"
+                                          x-text="line.purchase_uom === 'pack' ? 'Packs' : (line.base_uom || 'Units')"></span>
+                                    <template x-if="line.purchase_uom === 'pack'">
+                                        <div class="mt-0.5 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-bold text-[10px]"
+                                             x-text="'= ' + ((parseInt(line.quantity_received) || 0) * (parseInt(line.units_per_pack) || 1)) + ' ' + (line.base_uom || 'Tab')"></div>
+                                    </template>
                                 </td>
-                                <td class="py-2 px-2 text-center">
+
+                                <!-- Bonus Qty -->
+                                <td class="py-2.5 px-2 text-center">
                                     <input type="number" min="0" :name="'items[' + index + '][free_bonus_qty]'" 
                                            x-model.number="line.free_bonus_qty" placeholder="0"
                                            class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-center font-mono text-xs focus:ring-1 focus:ring-emerald-500">
+                                    <span class="block text-[10px] text-slate-400 mt-0.5"
+                                          x-text="line.purchase_uom === 'pack' ? 'Bonus Packs' : ('Bonus ' + (line.base_uom || 'Units'))"></span>
+                                    <template x-if="line.purchase_uom === 'pack' && (parseInt(line.free_bonus_qty) || 0) > 0">
+                                        <div class="mt-0.5 px-1 py-0.5 rounded bg-teal-50 border border-teal-200 text-teal-800 font-mono font-bold text-[10px]"
+                                             x-text="'+' + ((parseInt(line.free_bonus_qty) || 0) * (parseInt(line.units_per_pack) || 1)) + ' ' + (line.base_uom || 'Tab')"></div>
+                                    </template>
                                 </td>
-                                <td class="py-2 px-2 text-right">
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][cost_price]'" 
-                                           x-model.number="line.cost_price" required
-                                           class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-right font-mono text-xs focus:ring-1 focus:ring-emerald-500">
+
+                                <!-- Cost Price -->
+                                <td class="py-2.5 px-2 text-right">
+                                    <template x-if="line.purchase_uom === 'pack'">
+                                        <div class="space-y-1">
+                                            <div>
+                                                <label class="block text-[9px] text-indigo-600 font-bold uppercase">Per Pack Cost</label>
+                                                <input type="number" step="0.01" min="0"
+                                                       :name="'items[' + index + '][pack_cost_price]'"
+                                                       x-model.number="line.pack_cost_price"
+                                                       @input="onPackCostInput(index)"
+                                                       class="w-full px-2 py-1 bg-indigo-50/60 border border-indigo-300 rounded-lg text-right font-mono font-bold text-indigo-900 text-xs focus:ring-1 focus:ring-indigo-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] text-slate-500 font-semibold" x-text="'Per ' + (line.base_uom || 'Tablet') + ' Cost'"></label>
+                                                <input type="number" step="0.01" min="0"
+                                                       :name="'items[' + index + '][cost_price]'"
+                                                       x-model.number="line.cost_price"
+                                                       @input="onUnitCostInput(index)"
+                                                       required
+                                                       class="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg text-right font-mono text-[11px] text-slate-700 focus:ring-1 focus:ring-emerald-500">
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="line.purchase_uom !== 'pack'">
+                                        <div>
+                                            <input type="number" step="0.01" min="0" :name="'items[' + index + '][cost_price]'" 
+                                                   x-model.number="line.cost_price" required
+                                                   class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-right font-mono text-xs focus:ring-1 focus:ring-emerald-500">
+                                            <span class="block text-[9px] text-slate-400 mt-0.5" x-text="'per ' + (line.base_uom || 'Unit')"></span>
+                                        </div>
+                                    </template>
                                 </td>
-                                <td class="py-2 px-2 text-right">
-                                    <input type="number" step="0.01" min="0" :name="'items[' + index + '][retail_price]'" 
-                                           x-model.number="line.retail_price" required
-                                           class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-right font-mono font-bold text-emerald-700 text-xs focus:ring-1 focus:ring-emerald-500">
+
+                                <!-- Retail Price -->
+                                <td class="py-2.5 px-2 text-right">
+                                    <template x-if="line.purchase_uom === 'pack'">
+                                        <div class="space-y-1">
+                                            <div>
+                                                <label class="block text-[9px] text-indigo-600 font-bold uppercase">Per Pack Retail</label>
+                                                <input type="number" step="0.01" min="0"
+                                                       :name="'items[' + index + '][pack_retail_price]'"
+                                                       x-model.number="line.pack_retail_price"
+                                                       @input="onPackRetailInput(index)"
+                                                       class="w-full px-2 py-1 bg-indigo-50/60 border border-indigo-300 rounded-lg text-right font-mono font-bold text-indigo-900 text-xs focus:ring-1 focus:ring-indigo-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[9px] text-emerald-700 font-bold" x-text="'Per ' + (line.base_uom || 'Tablet') + ' Retail'"></label>
+                                                <input type="number" step="0.01" min="0"
+                                                       :name="'items[' + index + '][retail_price]'"
+                                                       x-model.number="line.retail_price"
+                                                       @input="onUnitRetailInput(index)"
+                                                       required
+                                                       class="w-full px-2 py-1 bg-emerald-50/60 border border-emerald-300 rounded-lg text-right font-mono font-bold text-emerald-800 text-[11px] focus:ring-1 focus:ring-emerald-500">
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="line.purchase_uom !== 'pack'">
+                                        <div>
+                                            <input type="number" step="0.01" min="0" :name="'items[' + index + '][retail_price]'" 
+                                                   x-model.number="line.retail_price" required
+                                                   class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-right font-mono font-bold text-emerald-700 text-xs focus:ring-1 focus:ring-emerald-500">
+                                            <span class="block text-[9px] text-emerald-600 mt-0.5" x-text="'per ' + (line.base_uom || 'Unit')"></span>
+                                        </div>
+                                    </template>
                                 </td>
-                                <td class="py-2 px-3 text-right font-mono font-bold text-slate-800">
-                                    <span x-text="'Rs. ' + ((line.quantity_received || 0) * (line.cost_price || 0)).toFixed(2)"></span>
+
+                                <!-- Line Subtotal -->
+                                <td class="py-2.5 px-2 text-right font-mono">
+                                    <div class="font-bold text-slate-900 text-xs" x-text="'Rs. ' + getLineSubtotal(line).toFixed(2)"></div>
+                                    <div class="text-[10px] text-emerald-700 font-semibold mt-1"
+                                         x-text="'Stock: +' + getLineTotalBaseUnits(line) + ' ' + (line.base_uom || 'Tab')"></div>
                                 </td>
-                                <td class="py-2 px-2 text-center">
+
+                                <!-- Remove -->
+                                <td class="py-2.5 px-1 text-center">
                                     <button type="button" @click="removeLineItem(index)" 
                                             class="text-rose-500 hover:text-rose-700 p-1" title="Remove line">
                                         <i class="fa-solid fa-trash-can"></i>
@@ -194,19 +313,24 @@
 function grnEntry() {
     return {
         lines: [
-            { product_id: '', batch_number: '', expiry_date: '', quantity_received: 100, free_bonus_qty: 0, cost_price: 0, retail_price: 0 },
-            { product_id: '', batch_number: '', expiry_date: '', quantity_received: 50, free_bonus_qty: 0, cost_price: 0, retail_price: 0 }
+            { product_id: '', purchase_uom: 'unit', base_uom: 'Tablet', units_per_pack: 1, batch_number: '', expiry_date: '', quantity_received: 5, free_bonus_qty: 0, cost_price: 0, retail_price: 0, pack_cost_price: 0, pack_retail_price: 0 },
+            { product_id: '', purchase_uom: 'unit', base_uom: 'Tablet', units_per_pack: 1, batch_number: '', expiry_date: '', quantity_received: 5, free_bonus_qty: 0, cost_price: 0, retail_price: 0, pack_cost_price: 0, pack_retail_price: 0 }
         ],
 
         addLineItem() {
             this.lines.push({
                 product_id: '',
+                purchase_uom: 'unit',
+                base_uom: 'Tablet',
+                units_per_pack: 1,
                 batch_number: '',
                 expiry_date: '',
-                quantity_received: 10,
+                quantity_received: 5,
                 free_bonus_qty: 0,
                 cost_price: 0,
-                retail_price: 0
+                retail_price: 0,
+                pack_cost_price: 0,
+                pack_retail_price: 0
             });
         },
 
@@ -222,17 +346,90 @@ function grnEntry() {
             const select = document.querySelector(`select[name="items[${index}][product_id]"]`);
             if (select && select.selectedIndex > 0) {
                 const opt = select.options[select.selectedIndex];
-                this.lines[index].cost_price = parseFloat(opt.dataset.cost) || 0;
-                this.lines[index].retail_price = parseFloat(opt.dataset.retail) || 0;
+                const line = this.lines[index];
+                const unitCost = parseFloat(opt.dataset.cost) || 0;
+                const unitRetail = parseFloat(opt.dataset.retail) || 0;
+                const packSize = Math.max(1, parseInt(opt.dataset.pack) || 1);
+
+                line.base_uom = opt.dataset.uom || 'Tablet';
+                line.units_per_pack = packSize;
+                line.purchase_uom = packSize > 1 ? 'pack' : 'unit';
+                line.cost_price = unitCost;
+                line.retail_price = unitRetail;
+                line.pack_cost_price = parseFloat((unitCost * packSize).toFixed(2));
+                line.pack_retail_price = parseFloat((unitRetail * packSize).toFixed(2));
             }
         },
 
+        onUomChange(index) {
+            const line = this.lines[index];
+            if (line.purchase_uom === 'pack') {
+                if (!line.units_per_pack || line.units_per_pack <= 1) {
+                    line.units_per_pack = 100;
+                }
+                line.pack_cost_price = parseFloat(((parseFloat(line.cost_price) || 0) * line.units_per_pack).toFixed(2));
+                line.pack_retail_price = parseFloat(((parseFloat(line.retail_price) || 0) * line.units_per_pack).toFixed(2));
+            } else {
+                line.units_per_pack = 1;
+            }
+        },
+
+        onPackSizeChange(index) {
+            const line = this.lines[index];
+            const packSize = Math.max(1, parseInt(line.units_per_pack) || 1);
+            if ((parseFloat(line.pack_cost_price) || 0) > 0) {
+                line.cost_price = parseFloat(((parseFloat(line.pack_cost_price) || 0) / packSize).toFixed(2));
+            }
+            if ((parseFloat(line.pack_retail_price) || 0) > 0) {
+                line.retail_price = parseFloat(((parseFloat(line.pack_retail_price) || 0) / packSize).toFixed(2));
+            }
+        },
+
+        onPackCostInput(index) {
+            const line = this.lines[index];
+            const packSize = Math.max(1, parseInt(line.units_per_pack) || 1);
+            line.cost_price = parseFloat(((parseFloat(line.pack_cost_price) || 0) / packSize).toFixed(2));
+        },
+
+        onUnitCostInput(index) {
+            const line = this.lines[index];
+            const packSize = Math.max(1, parseInt(line.units_per_pack) || 1);
+            line.pack_cost_price = parseFloat(((parseFloat(line.cost_price) || 0) * packSize).toFixed(2));
+        },
+
+        onPackRetailInput(index) {
+            const line = this.lines[index];
+            const packSize = Math.max(1, parseInt(line.units_per_pack) || 1);
+            line.retail_price = parseFloat(((parseFloat(line.pack_retail_price) || 0) / packSize).toFixed(2));
+        },
+
+        onUnitRetailInput(index) {
+            const line = this.lines[index];
+            const packSize = Math.max(1, parseInt(line.units_per_pack) || 1);
+            line.pack_retail_price = parseFloat(((parseFloat(line.retail_price) || 0) * packSize).toFixed(2));
+        },
+
+        getLineTotalBaseUnits(line) {
+            const qty = (parseInt(line.quantity_received) || 0) + (parseInt(line.free_bonus_qty) || 0);
+            const mult = line.purchase_uom === 'pack' ? Math.max(1, parseInt(line.units_per_pack) || 1) : 1;
+            return qty * mult;
+        },
+
+        getLineSubtotal(line) {
+            const recv = parseFloat(line.quantity_received) || 0;
+            if (line.purchase_uom === 'pack' && (parseInt(line.units_per_pack) || 1) > 1) {
+                const packCost = parseFloat(line.pack_cost_price) || ((parseFloat(line.cost_price) || 0) * (parseInt(line.units_per_pack) || 1));
+                return recv * packCost;
+            }
+            return recv * (parseFloat(line.cost_price) || 0);
+        },
+
         get totalUnits() {
-            return this.lines.reduce((sum, line) => sum + (parseInt(line.quantity_received) || 0) + (parseInt(line.free_bonus_qty) || 0), 0);
+            return this.lines.reduce((sum, line) => sum + this.getLineTotalBaseUnits(line), 0);
         },
 
         get totalAmount() {
-            return this.lines.reduce((sum, line) => sum + ((parseFloat(line.quantity_received) || 0) * (parseFloat(line.cost_price) || 0)), 0);
+            return this.lines.reduce((sum, line) => sum + this.getLineSubtotal(line), 0);
         },
 
         validateBeforeSubmit(e) {

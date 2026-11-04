@@ -64,6 +64,11 @@
                 <div class="bg-teal-50 border border-teal-200 rounded-2xl p-3 text-right">
                     <span class="text-[10px] font-bold text-teal-600 uppercase">Total Stock</span>
                     <div class="text-lg font-mono font-black text-teal-800">{{ $product->total_stock }} {{ $product->base_uom }}</div>
+                    @if(($product->units_per_pack ?? 1) > 1)
+                    <div class="text-[10px] font-mono font-semibold text-indigo-700">
+                        ({{ round($product->total_stock / $product->units_per_pack, 2) }} Packs of {{ $product->units_per_pack }})
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>

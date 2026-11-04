@@ -91,6 +91,10 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
                     @forelse($history as $item)
+                    @php
+                        $uom = $selectedProduct->base_uom ?? 'Tablet';
+                        $isPack = ($item->purchase_uom === 'pack' && ($item->units_per_pack ?? 1) > 1);
+                    @endphp
                     <tr class="hover:bg-slate-50 transition-colors">
                         <td class="py-3 px-4 font-mono">
                             {{ $item->grn->invoice_date ? $item->grn->invoice_date->format('d/m/Y') : '—' }}
@@ -109,17 +113,33 @@
                         <td class="py-3 px-4 font-mono">
                             {{ $item->expiry_date->format('d/m/Y') }}
                         </td>
-                        <td class="py-3 px-4 text-center font-mono font-bold">
-                            {{ $item->quantity_received }}
+                        <td class="py-3 px-4 text-center font-mono">
+                            @if($isPack && $item->packs_received)
+                                <span class="font-bold text-indigo-700">{{ $item->packs_received }} Packs</span>
+                                <span class="block text-[10px] text-slate-500">({{ $item->quantity_received }} {{ $uom }})</span>
+                            @else
+                                <span class="font-bold">{{ $item->quantity_received }} {{ $uom }}</span>
+                            @endif
                         </td>
                         <td class="py-3 px-4 text-center font-mono text-emerald-700">
-                            +{{ $item->free_bonus_qty }}
+                            @if($isPack && ($item->bonus_packs ?? 0) > 0)
+                                <span class="font-bold">+{{ $item->bonus_packs }} Packs</span>
+                                <span class="block text-[10px]">(+{{ $item->free_bonus_qty }} {{ $uom }})</span>
+                            @else
+                                +{{ $item->free_bonus_qty }} {{ $uom }}
+                            @endif
                         </td>
-                        <td class="py-3 px-4 text-right font-mono font-bold text-slate-800">
-                            Rs. {{ number_format($item->cost_price, 2) }}
+                        <td class="py-3 px-4 text-right font-mono">
+                            <span class="font-bold text-slate-800">Rs. {{ number_format($item->cost_price, 2) }}/{{ $uom }}</span>
+                            @if($isPack && $item->pack_cost_price)
+                                <span class="block text-[10px] text-indigo-600">Pack: Rs. {{ number_format($item->pack_cost_price, 2) }}</span>
+                            @endif
                         </td>
-                        <td class="py-3 px-4 text-right font-mono font-bold text-emerald-800">
-                            Rs. {{ number_format($item->retail_price, 2) }}
+                        <td class="py-3 px-4 text-right font-mono">
+                            <span class="font-bold text-emerald-800">Rs. {{ number_format($item->retail_price, 2) }}/{{ $uom }}</span>
+                            @if($isPack && $item->pack_retail_price)
+                                <span class="block text-[10px] text-indigo-600">Pack: Rs. {{ number_format($item->pack_retail_price, 2) }}</span>
+                            @endif
                         </td>
                         <td class="py-3 px-4 text-right font-mono font-bold text-slate-900">
                             Rs. {{ number_format($item->subtotal, 2) }}

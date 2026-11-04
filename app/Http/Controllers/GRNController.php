@@ -71,10 +71,14 @@ class GRNController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.batch_number' => 'required|string|max:100',
             'items.*.expiry_date' => 'required|date|after:today',
+            'items.*.purchase_uom' => 'nullable|in:unit,pack',
+            'items.*.units_per_pack' => 'nullable|integer|min:1',
             'items.*.quantity_received' => 'required|integer|min:1',
             'items.*.free_bonus_qty' => 'nullable|integer|min:0',
             'items.*.cost_price' => 'required|numeric|min:0',
             'items.*.retail_price' => 'required|numeric|min:0',
+            'items.*.pack_cost_price' => 'nullable|numeric|min:0',
+            'items.*.pack_retail_price' => 'nullable|numeric|min:0',
         ]);
 
         return DB::transaction(function () use ($validated) {
@@ -87,21 +91,58 @@ class GRNController extends Controller
             $grnItemsData = [];
 
             foreach ($validated['items'] as $item) {
-                $qty = (int) $item['quantity_received'];
-                $bonus = (int) ($item['free_bonus_qty'] ?? 0);
-                $cost = (float) $item['cost_price'];
-                $retail = (float) $item['retail_price'];
-                $lineSubtotal = round($qty * $cost, 2);
+                $purchaseUom = $item['purchase_uom'] ?? 'unit';
+                $unitsPerPack = ($purchaseUom === 'pack') ? max(1, (int) ($item['units_per_pack'] ?? 1)) : 1;
+
+                $enteredQty = (int) $item['quantity_received'];
+                $enteredBonus = (int) ($item['free_bonus_qty'] ?? 0);
+
+                if ($purchaseUom === 'pack' && $unitsPerPack > 1) {
+                    $packsReceived = $enteredQty;
+                    $bonusPacks = $enteredBonus;
+                    $baseQtyReceived = $enteredQty * $unitsPerPack;
+                    $baseBonusQty = $enteredBonus * $unitsPerPack;
+
+                    $unitCost = (float) $item['cost_price'];
+                    $unitRetail = (float) $item['retail_price'];
+                    $packCost = isset($item['pack_cost_price']) && (float) $item['pack_cost_price'] > 0
+                        ? (float) $item['pack_cost_price']
+                        : round($unitCost * $unitsPerPack, 2);
+                    $packRetail = isset($item['pack_retail_price']) && (float) $item['pack_retail_price'] > 0
+                        ? (float) $item['pack_retail_price']
+                        : round($unitRetail * $unitsPerPack, 2);
+
+                    $lineSubtotal = round($packsReceived * $packCost, 2);
+                } else {
+                    $purchaseUom = 'unit';
+                    $packsReceived = null;
+                    $bonusPacks = null;
+                    $baseQtyReceived = $enteredQty;
+                    $baseBonusQty = $enteredBonus;
+                    $unitCost = (float) $item['cost_price'];
+                    $unitRetail = (float) $item['retail_price'];
+                    $packCost = null;
+                    $packRetail = null;
+
+                    $lineSubtotal = round($baseQtyReceived * $unitCost, 2);
+                }
+
                 $totalAmount += $lineSubtotal;
 
                 $grnItemsData[] = [
                     'product_id' => $item['product_id'],
                     'batch_number' => trim($item['batch_number']),
                     'expiry_date' => $item['expiry_date'],
-                    'quantity_received' => $qty,
-                    'free_bonus_qty' => $bonus,
-                    'cost_price' => $cost,
-                    'retail_price' => $retail,
+                    'purchase_uom' => $purchaseUom,
+                    'units_per_pack' => $unitsPerPack,
+                    'packs_received' => $packsReceived,
+                    'bonus_packs' => $bonusPacks,
+                    'pack_cost_price' => $packCost,
+                    'pack_retail_price' => $packRetail,
+                    'quantity_received' => $baseQtyReceived,
+                    'free_bonus_qty' => $baseBonusQty,
+                    'cost_price' => $unitCost,
+                    'retail_price' => $unitRetail,
                     'subtotal' => $lineSubtotal,
                 ];
             }
@@ -151,12 +192,14 @@ class GRNController extends Controller
                     ]);
                 }
 
-                // Recalculate average purchase cost and update product retail price
+                // Recalculate average purchase cost and update product retail price & pack size
                 $product = Product::where('id', $itemData['product_id'])->first();
                 if ($product) {
-                    // Update latest unit price and cost price
                     $product->unit_cost_price = $itemData['cost_price'];
                     $product->unit_retail_price = $itemData['retail_price'];
+                    if ($itemData['purchase_uom'] === 'pack' && $itemData['units_per_pack'] > 1) {
+                        $product->units_per_pack = $itemData['units_per_pack'];
+                    }
                     $product->save();
                 }
             }
