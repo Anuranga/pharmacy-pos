@@ -46,7 +46,8 @@
                 <p class="text-xs text-slate-500 mt-1">
                     Category: <span class="font-semibold text-slate-700">{{ $product->category->name ?? 'General' }}</span> | 
                     Dosage: <span class="font-semibold text-slate-700">{{ $product->dosage_strength ?? 'N/A' }}</span> |
-                    Form: <span class="font-semibold text-slate-700">{{ ucfirst($product->item_type) }}</span> ({{ $product->base_uom }})
+                    Form: <span class="font-semibold text-slate-700">{{ ucfirst($product->item_type) }}</span> ({{ $product->base_uom }}) |
+                    Pack Size: <span class="font-semibold text-indigo-700">1 Pack = {{ $product->units_per_pack ?? 1 }} {{ $product->base_uom }}</span>
                 </p>
             </div>
 
@@ -206,7 +207,7 @@
 
                 <div>
                     <label class="block font-semibold text-slate-700 mb-1">New Physical Stock Count *</label>
-                    <input type="number" min="0" name="new_quantity" x-model.number="newQuantity" required
+                    <input type="number" name="new_quantity" x-model.number="newQuantity" required
                            class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-sm font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                 </div>
 

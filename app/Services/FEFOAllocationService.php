@@ -12,35 +12,30 @@ class FEFOAllocationService
     /**
      * Allocate quantity across unexpired batches using FEFO (First-Expired, First-Out).
      * Strictly enforces pessimistic row locking (lockForUpdate) during deduction.
+     * Allows stock balance to go into the negative when unexpired stock is 0 or insufficient.
      *
      * @param int $productId
      * @param int $quantity
+     * @param float|null $overrideUnitPrice
      * @return array Array of allocated items: [['batch_id', 'batch_number', 'expiry_date', 'quantity', 'cost_price', 'unit_price', 'subtotal']]
      * @throws Exception
      */
-    public function allocateAndDeduct(int $productId, int $quantity): array
+    public function allocateAndDeduct(int $productId, int $quantity, ?float $overrideUnitPrice = null): array
     {
         if ($quantity <= 0) {
             throw new Exception("Quantity to allocate must be greater than zero.");
         }
 
         $today = now()->toDateString();
+        $product = Product::find($productId);
 
-        // Pessimistic lock on batches for this product ordered by earliest expiry date
+        // Pessimistic lock on positive-stock unexpired batches ordered by earliest expiry date
         $batches = ProductBatch::where('product_id', $productId)
             ->where('expiry_date', '>', $today)
             ->where('stock_quantity', '>', 0)
             ->orderBy('expiry_date', 'asc')
             ->lockForUpdate()
             ->get();
-
-        $totalAvailable = $batches->sum('stock_quantity');
-
-        if ($totalAvailable < $quantity) {
-            $product = Product::find($productId);
-            $name = $product ? $product->brand_name : "Product #{$productId}";
-            throw new Exception("Insufficient unexpired stock for '{$name}'. Requested: {$quantity}, Unexpired Available: {$totalAvailable}.");
-        }
 
         $remainingToAllocate = $quantity;
         $allocations = [];
@@ -54,19 +49,91 @@ class FEFOAllocationService
             $batch->stock_quantity -= $deductQty;
             $batch->save();
 
-            $subtotal = round($deductQty * (float) $batch->selling_price, 2);
+            $unitPrice = (float) $batch->selling_price > 0
+                ? (float) $batch->selling_price
+                : (float) ($overrideUnitPrice ?? $product?->unit_retail_price ?? 0);
+            $costPrice = (float) $batch->purchase_cost > 0
+                ? (float) $batch->purchase_cost
+                : (float) ($product?->unit_cost_price ?? 0);
+            $subtotal = round($deductQty * $unitPrice, 2);
 
             $allocations[] = [
                 'batch_id' => $batch->id,
                 'batch_number' => $batch->batch_number,
                 'expiry_date' => $batch->expiry_date->toDateString(),
                 'quantity' => $deductQty,
-                'cost_price' => (float) $batch->purchase_cost,
-                'unit_price' => (float) $batch->selling_price,
+                'cost_price' => $costPrice,
+                'unit_price' => $unitPrice,
                 'subtotal' => $subtotal,
             ];
 
             $remainingToAllocate -= $deductQty;
+        }
+
+        // If stock was insufficient, 0, or already negative, allow balance to go negative
+        if ($remainingToAllocate > 0) {
+            if ($batches->isNotEmpty()) {
+                // Deduct the deficit from the last batch we just depleted so its stock goes negative
+                $lastBatch = $batches->last();
+                $lastBatch->stock_quantity -= $remainingToAllocate;
+                $lastBatch->save();
+
+                $lastIndex = count($allocations) - 1;
+                $allocations[$lastIndex]['quantity'] += $remainingToAllocate;
+                $allocations[$lastIndex]['subtotal'] = round(
+                    $allocations[$lastIndex]['quantity'] * $allocations[$lastIndex]['unit_price'],
+                    2
+                );
+            } else {
+                // Find an existing unexpired batch (even with <= 0 stock), or any batch for this product
+                $fallbackBatch = ProductBatch::where('product_id', $productId)
+                    ->where('expiry_date', '>', $today)
+                    ->orderBy('expiry_date', 'desc')
+                    ->orderBy('id', 'desc')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$fallbackBatch) {
+                    $fallbackBatch = ProductBatch::where('product_id', $productId)
+                        ->orderBy('expiry_date', 'desc')
+                        ->orderBy('id', 'desc')
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                if ($fallbackBatch) {
+                    $fallbackBatch->stock_quantity -= $remainingToAllocate;
+                    $fallbackBatch->save();
+                } else {
+                    // Product has no batch records yet; create an automatic batch with negative balance
+                    $fallbackBatch = ProductBatch::create([
+                        'product_id' => $productId,
+                        'batch_number' => 'AUTO-' . date('Ymd'),
+                        'expiry_date' => now()->addYears(2)->toDateString(),
+                        'purchase_cost' => (float) ($product?->unit_cost_price ?? 0),
+                        'selling_price' => (float) ($overrideUnitPrice ?? $product?->unit_retail_price ?? 0),
+                        'stock_quantity' => -$remainingToAllocate,
+                    ]);
+                }
+
+                $unitPrice = (float) $fallbackBatch->selling_price > 0
+                    ? (float) $fallbackBatch->selling_price
+                    : (float) ($overrideUnitPrice ?? $product?->unit_retail_price ?? 0);
+                $costPrice = (float) $fallbackBatch->purchase_cost > 0
+                    ? (float) $fallbackBatch->purchase_cost
+                    : (float) ($product?->unit_cost_price ?? 0);
+                $subtotal = round($remainingToAllocate * $unitPrice, 2);
+
+                $allocations[] = [
+                    'batch_id' => $fallbackBatch->id,
+                    'batch_number' => $fallbackBatch->batch_number,
+                    'expiry_date' => $fallbackBatch->expiry_date->toDateString(),
+                    'quantity' => $remainingToAllocate,
+                    'cost_price' => $costPrice,
+                    'unit_price' => $unitPrice,
+                    'subtotal' => $subtotal,
+                ];
+            }
         }
 
         return $allocations;

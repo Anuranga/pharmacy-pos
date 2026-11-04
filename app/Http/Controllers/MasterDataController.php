@@ -199,7 +199,7 @@ class MasterDataController extends Controller
     {
         $validated = $request->validate([
             'batch_id' => 'required|exists:product_batches,id',
-            'new_quantity' => 'required|integer|min:0',
+            'new_quantity' => 'required|integer',
             'reason' => 'required|in:Damage,Expiry,Breakage,Audit Recount,Other',
             'notes' => 'nullable|string',
         ]);

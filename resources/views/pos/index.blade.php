@@ -139,7 +139,13 @@
                             
                             <!-- Badges Header -->
                             <div class="flex items-start justify-between gap-1 mb-1">
-                                <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200" x-text="product.item_type"></span>
+                                <div class="flex items-center gap-1 flex-wrap">
+                                    <span class="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200" x-text="product.item_type"></span>
+                                    <template x-if="product.units_per_pack > 1">
+                                        <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                              x-text="'1 Pack = ' + product.units_per_pack + ' ' + (product.base_uom || 'Tab')"></span>
+                                    </template>
+                                </div>
                                 
                                 <div class="flex items-center gap-1">
                                     <template x-if="product.requires_prescription">
@@ -161,18 +167,29 @@
                             <!-- Stock & FEFO Batch Badge -->
                             <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
                                 <div>
-                                    <span class="font-display font-bold text-sm text-emerald-700" x-text="'Rs. ' + parseFloat(product.retail_price).toFixed(2)"></span>
+                                    <div class="flex items-baseline gap-1">
+                                        <span class="font-display font-bold text-sm text-emerald-700" x-text="'Rs. ' + parseFloat(product.retail_price).toFixed(2)"></span>
+                                        <span class="text-[9px] text-slate-400 font-mono" x-text="'/' + (product.base_uom || 'Unit')"></span>
+                                    </div>
+                                    <template x-if="product.units_per_pack > 1">
+                                        <div class="text-[10px] font-mono font-semibold text-indigo-600"
+                                             x-text="'Pack (' + product.units_per_pack + '): Rs. ' + (parseFloat(product.retail_price) * product.units_per_pack).toFixed(2)"></div>
+                                    </template>
                                 </div>
 
                                 <div class="text-right">
                                     <template x-if="product.total_stock > 0">
-                                        <div class="flex items-center gap-1">
+                                        <div class="flex items-center justify-end gap-1">
                                             <span class="text-[10px] font-semibold text-slate-600" x-text="product.total_stock + ' ' + (product.base_uom || 'units')"></span>
                                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" title="In Stock"></span>
                                         </div>
                                     </template>
-                                    <template x-if="product.total_stock <= 0">
-                                        <span class="text-[10px] font-bold text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200">OUT OF STOCK</span>
+                                    <template x-if="product.total_stock === 0">
+                                        <span class="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">0 STOCK</span>
+                                    </template>
+                                    <template x-if="product.total_stock < 0">
+                                        <span class="text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200"
+                                              x-text="product.total_stock + ' ' + (product.base_uom || 'units')"></span>
                                     </template>
 
                                     <!-- Earliest Expiry FEFO Badge -->
@@ -181,6 +198,24 @@
                                     </template>
                                 </div>
                             </div>
+
+                            <!-- Quick Unit vs Pack Add Buttons (when units_per_pack > 1) -->
+                            <template x-if="product.units_per_pack > 1">
+                                <div class="mt-2 pt-1.5 border-t border-slate-100 grid grid-cols-2 gap-1.5" @click.stop>
+                                    <button type="button"
+                                            @click="addToCart(product, 'unit')"
+                                            class="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 text-[10px] font-bold transition-colors flex items-center justify-center gap-1">
+                                        <i class="fa-solid fa-pills text-[9px]"></i>
+                                        <span x-text="'+1 ' + (product.base_uom || 'Tablet')"></span>
+                                    </button>
+                                    <button type="button"
+                                            @click="addToCart(product, 'pack')"
+                                            class="py-1 px-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 border border-indigo-200 text-[10px] font-bold transition-colors flex items-center justify-center gap-1">
+                                        <i class="fa-solid fa-box-open text-[9px]"></i>
+                                        <span x-text="'+1 Pack (' + product.units_per_pack + ')'"></span>
+                                    </button>
+                                </div>
+                            </template>
 
                         </div>
                     </template>
@@ -267,51 +302,81 @@
                 </template>
 
                 <div class="space-y-1.5">
-                    <template x-for="(item, index) in cart" :key="item.product_id">
-                        <div class="bg-slate-50 hover:bg-slate-100/80 border border-slate-200/90 rounded-xl p-2 flex items-center justify-between text-xs transition-colors">
-                            
-                            <!-- Item info -->
-                            <div class="flex-1 min-w-0 pr-2">
-                                <div class="flex items-center gap-1.5">
-                                    <h5 class="font-bold text-slate-800 text-xs truncate" x-text="item.brand_name"></h5>
-                                    <span class="text-[9px] bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-mono" x-text="item.item_type"></span>
+                    <template x-for="(item, index) in cart" :key="item.product_id + '-' + item.sell_unit">
+                        <div class="bg-slate-50 hover:bg-slate-100/80 border border-slate-200/90 rounded-xl p-2 flex flex-col gap-1.5 text-xs transition-colors">
+                            <div class="flex items-center justify-between">
+                                <!-- Item info -->
+                                <div class="flex-1 min-w-0 pr-2">
+                                    <div class="flex items-center gap-1.5">
+                                        <h5 class="font-bold text-slate-800 text-xs truncate" x-text="item.brand_name"></h5>
+                                        <span class="text-[9px] bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-mono" x-text="item.item_type"></span>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center flex-wrap gap-1.5">
+                                        <span class="font-semibold text-slate-700">
+                                            Rs. <span x-text="getItemActiveUnitPrice(item).toFixed(2)"></span>
+                                            /<span x-text="item.sell_unit === 'pack' ? ('Pack of ' + item.units_per_pack) : (item.base_uom || 'Unit')"></span>
+                                        </span>
+                                        <template x-if="item.sell_unit === 'pack'">
+                                            <span class="text-indigo-700 font-bold bg-indigo-100/80 px-1.5 py-0.2 rounded border border-indigo-200"
+                                                  x-text="'= ' + (item.quantity * item.units_per_pack) + ' ' + (item.base_uom || 'Tab')"></span>
+                                        </template>
+                                        <span class="text-emerald-700 font-semibold bg-emerald-100/60 px-1 rounded">FEFO: <span x-text="item.earliest_expiry || 'Active'"></span></span>
+                                    </div>
                                 </div>
-                                <div class="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                                    <span>Rs. <span x-text="parseFloat(item.unit_price).toFixed(2)"></span></span>
-                                    <span class="text-emerald-700 font-semibold bg-emerald-100/60 px-1 rounded">FEFO: <span x-text="item.earliest_expiry || 'Active'"></span></span>
+
+                                <!-- Quantity Adjuster -->
+                                <div class="flex items-center space-x-1">
+                                    <button type="button" 
+                                            @click="decreaseQty(index)" 
+                                            class="w-6 h-6 rounded-lg bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold transition-colors">
+                                        -
+                                    </button>
+                                    <input type="number" 
+                                           min="1" 
+                                           x-model.number="item.quantity"
+                                           @input="validateItemQty(index)"
+                                           class="w-12 h-6 text-center text-xs font-bold font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                                    <button type="button" 
+                                            @click="increaseQty(index)" 
+                                            class="w-6 h-6 rounded-lg bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold transition-colors">
+                                        +
+                                    </button>
+                                </div>
+
+                                <!-- Line Subtotal & Remove -->
+                                <div class="w-20 text-right pl-2">
+                                    <div class="font-bold font-mono text-xs text-slate-900" x-text="'Rs. ' + (item.quantity * getItemActiveUnitPrice(item)).toFixed(2)"></div>
+                                    <button type="button" 
+                                            @click="removeFromCart(index)" 
+                                            class="text-[10px] text-rose-500 hover:text-rose-700 transition-colors">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
                                 </div>
                             </div>
 
-                            <!-- Quantity Adjuster -->
-                            <div class="flex items-center space-x-1">
-                                <button type="button" 
-                                        @click="decreaseQty(index)" 
-                                        class="w-6 h-6 rounded-lg bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold transition-colors">
-                                    -
-                                </button>
-                                <input type="number" 
-                                       min="1" 
-                                       :max="item.total_stock"
-                                       x-model.number="item.quantity"
-                                       @input="validateItemQty(index)"
-                                       class="w-12 h-6 text-center text-xs font-bold font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                                <button type="button" 
-                                        @click="increaseQty(index)" 
-                                        class="w-6 h-6 rounded-lg bg-white border border-slate-300 hover:bg-slate-200 flex items-center justify-center text-slate-700 font-bold transition-colors">
-                                    +
-                                </button>
-                            </div>
-
-                            <!-- Line Subtotal & Remove -->
-                            <div class="w-20 text-right pl-2">
-                                <div class="font-bold font-mono text-xs text-slate-900" x-text="'Rs. ' + (item.quantity * item.unit_price).toFixed(2)"></div>
-                                <button type="button" 
-                                        @click="removeFromCart(index)" 
-                                        class="text-[10px] text-rose-500 hover:text-rose-700 transition-colors">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </div>
-
+                            <!-- Pack vs. Tablet/Unit Selector Bar (shown when units_per_pack > 1) -->
+                            <template x-if="item.units_per_pack > 1">
+                                <div class="flex items-center justify-between pt-1 border-t border-slate-200/70 text-[10px]">
+                                    <span class="text-slate-500 font-semibold flex items-center gap-1">
+                                        <i class="fa-solid fa-scale-balanced text-indigo-500"></i>
+                                        <span>Billing Unit:</span>
+                                    </span>
+                                    <div class="inline-flex rounded-lg p-0.5 bg-slate-200/80 border border-slate-300/80">
+                                        <button type="button"
+                                                @click="setItemSellUnit(index, 'unit')"
+                                                :class="item.sell_unit === 'unit' ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                                                class="px-2 py-0.5 rounded-md transition-all"
+                                                x-text="(item.base_uom || 'Tablet') + ' (Rs. ' + item.base_unit_price.toFixed(2) + ')'">
+                                        </button>
+                                        <button type="button"
+                                                @click="setItemSellUnit(index, 'pack')"
+                                                :class="item.sell_unit === 'pack' ? 'bg-indigo-600 text-white font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'"
+                                                class="px-2 py-0.5 rounded-md transition-all"
+                                                x-text="'Pack x' + item.units_per_pack + ' (Rs. ' + (item.base_unit_price * item.units_per_pack).toFixed(2) + ')'">
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </template>
                 </div>
@@ -331,10 +396,13 @@
                     <div class="flex justify-between items-center text-slate-300">
                         <span class="flex items-center gap-1">
                             Discount
-                            <input type="number" min="0" step="0.5" x-model.number="discountAmount" 
+                            <input type="number" step="0.5" x-model.number="discountAmount" 
+                                   title="Enter positive value for discount, or negative value (e.g. -2) to add to total"
                                    class="w-16 h-5 px-1 bg-slate-800 text-[11px] text-right rounded border border-slate-700 font-mono text-emerald-400">
                         </span>
-                        <span class="font-mono text-emerald-400" x-text="'- Rs. ' + (discountAmount || 0).toFixed(2)"></span>
+                        <span class="font-mono"
+                              :class="(parseFloat(discountAmount) || 0) < 0 ? 'text-amber-400' : 'text-emerald-400'"
+                              x-text="((parseFloat(discountAmount) || 0) < 0 ? '+ Rs. ' + Math.abs(parseFloat(discountAmount) || 0).toFixed(2) : '- Rs. ' + (parseFloat(discountAmount) || 0).toFixed(2))"></span>
                     </div>
 
                     <div class="flex justify-between items-center text-slate-300">
@@ -476,7 +544,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-2">
+                <div class="grid grid-cols-4 gap-2">
                     <div>
                         <label class="block font-semibold text-slate-700 mb-1">Item Type</label>
                         <select x-model="quickForm.item_type" class="w-full px-2 py-1.5 border rounded-lg">
@@ -491,6 +559,10 @@
                     <div>
                         <label class="block font-semibold text-slate-700 mb-1">Base UOM</label>
                         <input type="text" x-model="quickForm.base_uom" placeholder="Tablet/Bottle" class="w-full px-2 py-1.5 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Units / Pack</label>
+                        <input type="number" min="1" x-model.number="quickForm.units_per_pack" class="w-full px-2 py-1.5 border rounded-lg font-mono">
                     </div>
                     <div>
                         <label class="block font-semibold text-slate-700 mb-1">Category</label>
@@ -519,7 +591,7 @@
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="block font-medium text-slate-700">Stock Qty *</label>
-                            <input type="number" min="1" x-model.number="quickForm.initial_stock" required class="w-full px-2 py-1 border rounded bg-white">
+                            <input type="number" x-model.number="quickForm.initial_stock" required class="w-full px-2 py-1 border rounded bg-white">
                         </div>
                         <div>
                             <label class="block font-medium text-slate-700">Cost Price (Rs.) *</label>
@@ -658,6 +730,7 @@ function posTerminal() {
             item_type: 'tablet',
             category_id: '',
             base_uom: 'Tablet',
+            units_per_pack: 1,
             initial_batch_number: 'BATCH-01',
             initial_expiry_date: '',
             initial_stock: 50,
@@ -786,38 +859,26 @@ function posTerminal() {
             }
         },
 
-        addToCart(product) {
-            if (product.total_stock <= 0) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Out of Stock',
-                    text: `${product.brand_name} has 0 available unexpired units.`,
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-                return;
-            }
+        addToCart(product, preferredUnit = null) {
+            const unitsPerPack = Math.max(1, parseInt(product.units_per_pack) || 1);
+            const targetUnit = (preferredUnit === 'pack' && unitsPerPack > 1) ? 'pack' : 'unit';
 
-            const existingIndex = this.cart.findIndex(i => i.product_id === product.id);
+            // Look for an existing cart entry with the same product_id and sell_unit
+            const existingIndex = this.cart.findIndex(i => i.product_id === product.id && i.sell_unit === targetUnit);
 
             if (existingIndex > -1) {
-                if (this.cart[existingIndex].quantity < product.total_stock) {
-                    this.cart[existingIndex].quantity++;
-                } else {
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Stock Limit Reached',
-                        text: `Cannot add more than available unexpired stock (${product.total_stock}).`,
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                }
+                this.cart[existingIndex].quantity++;
             } else {
+                const basePrice = parseFloat(product.retail_price) || 0;
                 this.cart.push({
                     product_id: product.id,
                     brand_name: product.brand_name,
                     item_type: product.item_type,
-                    unit_price: parseFloat(product.retail_price),
+                    base_uom: product.base_uom || 'Tablet',
+                    units_per_pack: unitsPerPack,
+                    sell_unit: targetUnit,
+                    base_unit_price: basePrice,
+                    unit_price: basePrice,
                     quantity: 1,
                     total_stock: product.total_stock,
                     earliest_expiry: product.earliest_expiry,
@@ -829,11 +890,30 @@ function posTerminal() {
             this.focusBarcode();
         },
 
-        increaseQty(index) {
+        getItemActiveUnitPrice(item) {
+            const basePrice = parseFloat(item.base_unit_price) || 0;
+            const packSize = Math.max(1, parseInt(item.units_per_pack) || 1);
+            return item.sell_unit === 'pack' ? (basePrice * packSize) : basePrice;
+        },
+
+        setItemSellUnit(index, unitMode) {
             const item = this.cart[index];
-            if (item.quantity < item.total_stock) {
-                item.quantity++;
+            if (!item) return;
+            const targetMode = (unitMode === 'pack' && item.units_per_pack > 1) ? 'pack' : 'unit';
+            if (item.sell_unit === targetMode) return;
+
+            // Check if another cart line already exists for this product + targetMode
+            const duplicateIndex = this.cart.findIndex((c, idx) => idx !== index && c.product_id === item.product_id && c.sell_unit === targetMode);
+            if (duplicateIndex > -1) {
+                this.cart[duplicateIndex].quantity += item.quantity;
+                this.cart.splice(index, 1);
+            } else {
+                item.sell_unit = targetMode;
             }
+        },
+
+        increaseQty(index) {
+            this.cart[index].quantity++;
         },
 
         decreaseQty(index) {
@@ -846,10 +926,7 @@ function posTerminal() {
 
         validateItemQty(index) {
             const item = this.cart[index];
-            if (item.quantity > item.total_stock) {
-                item.quantity = item.total_stock;
-            }
-            if (item.quantity < 1) {
+            if (!item.quantity || item.quantity < 1) {
                 item.quantity = 1;
             }
         },
@@ -879,7 +956,7 @@ function posTerminal() {
 
         // Financial Getters
         get subtotal() {
-            return this.cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+            return this.cart.reduce((sum, item) => sum + (item.quantity * this.getItemActiveUnitPrice(item)), 0);
         },
 
         get grandTotal() {
@@ -931,8 +1008,8 @@ function posTerminal() {
             const payload = {
                 items: this.cart.map(i => ({
                     product_id: i.product_id,
-                    quantity: i.quantity,
-                    unit_price: i.unit_price,
+                    quantity: i.sell_unit === 'pack' ? (i.quantity * i.units_per_pack) : i.quantity,
+                    unit_price: i.base_unit_price,
                 })),
                 customer_id: this.selectedCustomerId || null,
                 payment_type: this.paymentType,

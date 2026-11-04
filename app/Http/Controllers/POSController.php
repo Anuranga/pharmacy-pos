@@ -78,6 +78,12 @@ class POSController extends Controller
         $formatted = $products->map(function ($product) {
             $batches = $product->activeBatches;
             $earliestBatch = $batches->first();
+            $retailPrice = ($earliestBatch && (float) $earliestBatch->selling_price > 0)
+                ? (float) $earliestBatch->selling_price
+                : (float) $product->unit_retail_price;
+            $costPrice = ($earliestBatch && (float) $earliestBatch->purchase_cost > 0)
+                ? (float) $earliestBatch->purchase_cost
+                : (float) $product->unit_cost_price;
 
             return [
                 'id' => $product->id,
@@ -87,10 +93,11 @@ class POSController extends Controller
                 'dosage_strength' => $product->dosage_strength ?? '',
                 'item_type' => $product->item_type,
                 'base_uom' => $product->base_uom,
+                'units_per_pack' => max(1, (int) ($product->units_per_pack ?? 1)),
                 'requires_prescription' => (bool) $product->requires_prescription,
                 'is_controlled' => (bool) $product->is_controlled,
-                'retail_price' => (float) ($earliestBatch ? $earliestBatch->selling_price : $product->unit_retail_price),
-                'cost_price' => (float) ($earliestBatch ? $earliestBatch->purchase_cost : $product->unit_cost_price),
+                'retail_price' => $retailPrice,
+                'cost_price' => $costPrice,
                 'total_stock' => (int) $batches->sum('stock_quantity'),
                 'batches_count' => $batches->count(),
                 'earliest_expiry' => $earliestBatch ? $earliestBatch->expiry_date->format('Y-m-d') : null,
@@ -132,15 +139,9 @@ class POSController extends Controller
         $batches = $product->activeBatches;
         $totalStock = (int) $batches->sum('stock_quantity');
         $earliestBatch = $batches->first();
-
-        if ($totalStock <= 0) {
-            return response()->json([
-                'success' => false,
-                'message' => "Product '{$product->brand_name}' has 0 unexpired stock.",
-                'out_of_stock' => true,
-                'product' => $product,
-            ], 400);
-        }
+        $retailPrice = ($earliestBatch && (float) $earliestBatch->selling_price > 0)
+            ? (float) $earliestBatch->selling_price
+            : (float) $product->unit_retail_price;
 
         return response()->json([
             'success' => true,
@@ -152,9 +153,10 @@ class POSController extends Controller
                 'dosage_strength' => $product->dosage_strength ?? '',
                 'item_type' => $product->item_type,
                 'base_uom' => $product->base_uom,
+                'units_per_pack' => max(1, (int) ($product->units_per_pack ?? 1)),
                 'requires_prescription' => (bool) $product->requires_prescription,
                 'is_controlled' => (bool) $product->is_controlled,
-                'retail_price' => (float) ($earliestBatch ? $earliestBatch->selling_price : $product->unit_retail_price),
+                'retail_price' => $retailPrice,
                 'total_stock' => $totalStock,
                 'earliest_expiry' => $earliestBatch ? $earliestBatch->expiry_date->format('Y-m-d') : null,
                 'earliest_batch_no' => $earliestBatch ? $earliestBatch->batch_number : null,
@@ -175,9 +177,10 @@ class POSController extends Controller
             'item_type' => 'required|string',
             'category_id' => 'nullable|exists:categories,id',
             'base_uom' => 'required|string',
+            'units_per_pack' => 'nullable|integer|min:1',
             'initial_batch_number' => 'required|string',
             'initial_expiry_date' => 'required|date|after:today',
-            'initial_stock' => 'required|integer|min:1',
+            'initial_stock' => 'required|integer',
             'cost_price' => 'required|numeric|min:0',
             'retail_price' => 'required|numeric|min:0',
             'requires_prescription' => 'nullable|boolean',
@@ -193,7 +196,7 @@ class POSController extends Controller
                 'item_type' => $validated['item_type'],
                 'category_id' => $validated['category_id'] ?? null,
                 'base_uom' => $validated['base_uom'],
-                'units_per_pack' => 1,
+                'units_per_pack' => max(1, (int) ($validated['units_per_pack'] ?? 1)),
                 'reorder_min' => 10,
                 'reorder_max' => 100,
                 'requires_prescription' => !empty($validated['requires_prescription']),
@@ -222,6 +225,7 @@ class POSController extends Controller
                     'dosage_strength' => $product->dosage_strength,
                     'item_type' => $product->item_type,
                     'base_uom' => $product->base_uom,
+                    'units_per_pack' => (int) $product->units_per_pack,
                     'requires_prescription' => (bool) $product->requires_prescription,
                     'is_controlled' => (bool) $product->is_controlled,
                     'retail_price' => (float) $batch->selling_price,
@@ -247,7 +251,7 @@ class POSController extends Controller
             'customer_id' => 'nullable|exists:customers,id',
             'payment_type' => 'required|in:cash,card,qr,credit_lending,split',
             'amount_paid' => 'nullable|numeric|min:0',
-            'discount_amount' => 'nullable|numeric|min:0',
+            'discount_amount' => 'nullable|numeric',
             'tax_amount' => 'nullable|numeric|min:0',
             // Prescription fields (if Rx required)
             'doctor_name' => 'nullable|string|max:150',
@@ -293,8 +297,9 @@ class POSController extends Controller
                 foreach ($validated['items'] as $item) {
                     $prodId = (int) $item['product_id'];
                     $qty = (int) $item['quantity'];
+                    $overridePrice = isset($item['unit_price']) ? (float) $item['unit_price'] : null;
 
-                    $allocations = $this->fefoService->allocateAndDeduct($prodId, $qty);
+                    $allocations = $this->fefoService->allocateAndDeduct($prodId, $qty, $overridePrice);
                     foreach ($allocations as $alloc) {
                         $alloc['product_id'] = $prodId;
                         $allAllocations[] = $alloc;

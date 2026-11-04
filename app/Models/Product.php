@@ -52,8 +52,8 @@ class Product extends Model
     public function activeBatches()
     {
         return $this->hasMany(ProductBatch::class)
-            ->where('stock_quantity', '>', 0)
             ->where('expiry_date', '>', now()->toDateString())
+            ->orderByRaw('CASE WHEN stock_quantity > 0 THEN 0 ELSE 1 END')
             ->orderBy('expiry_date', 'asc');
     }
 

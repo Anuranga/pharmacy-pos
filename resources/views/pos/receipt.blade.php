@@ -154,9 +154,14 @@
             <tr>
                 <td class="text-left">
                     <div class="font-bold">{{ $item->product->brand_name }}</div>
-                    <div style="font-size: 10px; color: #333;">B:{{ $item->batch->batch_number ?? 'N/A' }} Exp:{{ optional($item->batch->expiry_date)->format('m/y') }}</div>
+                    <div style="font-size: 10px; color: #333;">
+                        B:{{ $item->batch->batch_number ?? 'N/A' }} Exp:{{ optional($item->batch->expiry_date)->format('m/y') }}
+                        @if(($item->product->units_per_pack ?? 1) > 1 && $item->quantity >= $item->product->units_per_pack && $item->quantity % $item->product->units_per_pack === 0)
+                            | {{ $item->quantity / $item->product->units_per_pack }} Pack(s)
+                        @endif
+                    </div>
                 </td>
-                <td class="text-right">{{ $item->quantity }}</td>
+                <td class="text-right">{{ $item->quantity }} <span style="font-size: 9px;">{{ $item->product->base_uom ?? '' }}</span></td>
                 <td class="text-right">{{ number_format($item->unit_price, 2) }}</td>
                 <td class="text-right font-bold">{{ number_format($item->subtotal, 2) }}</td>
             </tr>
@@ -165,11 +170,11 @@
     </table>
 
     <table class="totals-table">
+        @if($sale->discount_amount > 0)
         <tr>
             <td>Subtotal:</td>
             <td class="text-right font-mono">Rs. {{ number_format($sale->subtotal, 2) }}</td>
         </tr>
-        @if($sale->discount_amount > 0)
         <tr>
             <td>Discount:</td>
             <td class="text-right font-mono">- Rs. {{ number_format($sale->discount_amount, 2) }}</td>

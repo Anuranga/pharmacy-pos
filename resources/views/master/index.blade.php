@@ -151,7 +151,12 @@
                         </td>
                         <td class="py-3 px-4">
                             <span class="font-semibold text-slate-800">{{ $prod->dosage_strength ?? '—' }}</span>
-                            <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono block w-fit mt-0.5">{{ ucfirst($prod->item_type) }}</span>
+                            <div class="flex items-center gap-1 mt-0.5">
+                                <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono block w-fit">{{ ucfirst($prod->item_type) }}</span>
+                                @if(($prod->units_per_pack ?? 1) > 1)
+                                <span class="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-mono font-bold block w-fit">1 Pack = {{ $prod->units_per_pack }} {{ $prod->base_uom }}</span>
+                                @endif
+                            </div>
                         </td>
                         <td class="py-3 px-4">
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">

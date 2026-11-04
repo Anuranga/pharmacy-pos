@@ -28,10 +28,6 @@ class StockAdjustmentService
         int $adjustedBy,
         ?string $notes = null
     ): StockAdjustment {
-        if ($newQuantity < 0) {
-            throw new Exception("New quantity cannot be negative.");
-        }
-
         $validReasons = ['Damage', 'Expiry', 'Breakage', 'Audit Recount', 'Other'];
         if (!in_array($reason, $validReasons)) {
             throw new Exception("Invalid adjustment reason. Must be one of: " . implode(', ', $validReasons));
