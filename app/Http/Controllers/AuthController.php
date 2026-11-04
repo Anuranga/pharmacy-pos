@@ -13,7 +13,7 @@ class AuthController extends Controller
     public function showLogin()
     {
         if (Auth::check()) {
-            return redirect()->route('pos.index');
+            return redirect()->route('dashboard');
         }
 
         $users = User::with('role')->where('status', 'active')->get();
@@ -29,7 +29,7 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-            return redirect()->intended(route('pos.index'));
+            return redirect()->route('dashboard');
         }
 
         return back()->withErrors([
@@ -43,7 +43,7 @@ class AuthController extends Controller
     public function switchUser(User $user)
     {
         Auth::login($user);
-        return redirect()->route('pos.index')->with('success', "Logged in as {$user->name} ({$user->role->label})");
+        return redirect()->route('dashboard')->with('success', "Logged in as {$user->name} ({$user->role->label})");
     }
 
     public function logout(Request $request)

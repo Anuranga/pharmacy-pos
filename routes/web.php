@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GRNController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\POSController;
@@ -23,8 +24,11 @@ Route::get('/auth/switch/{user}', [AuthController::class, 'switchUser'])->name('
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', function () {
-        return redirect()->route('pos.index');
+        return redirect()->route('dashboard');
     });
+
+    // Executive & Clinical Operations Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // POS Counter Terminal (Both Cashier and Admin)
     Route::prefix('pos')->name('pos.')->group(function () {

@@ -69,42 +69,49 @@
 
     <!-- Top Navigation Bar -->
     <header class="no-print bg-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
+        <div class="w-full max-w-[1600px] mx-auto px-3 sm:px-5">
+            <div class="flex items-center justify-between h-14 gap-2">
                 
                 <!-- Logo & Brand -->
-                <div class="flex items-center space-x-3">
-                    <a href="{{ route('pos.index') }}" class="flex items-center space-x-2.5 group">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                            <i class="fa-solid fa-mortar-pestle text-lg"></i>
+                <div class="flex items-center shrink-0">
+                    <a href="{{ route('dashboard') }}" class="flex items-center space-x-2 group">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-mortar-pestle text-base"></i>
                         </div>
                         <div>
-                            <span class="font-display font-bold text-lg tracking-tight text-white flex items-center gap-1.5">
-                                PharmaCare <span class="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono font-medium border border-emerald-500/30">POS Pro</span>
+                            <span class="font-display font-bold text-base tracking-tight text-white flex items-center gap-1.5 leading-none">
+                                PharmaCare <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono font-medium border border-emerald-500/30">POS Pro</span>
                             </span>
-                            <span class="text-[10px] text-slate-400 block tracking-wider uppercase font-medium">Pharmacy & Financial Ledger</span>
+                            <span class="text-[9px] text-slate-400 hidden xl:block tracking-wider uppercase font-medium mt-0.5">Pharmacy & Financial Ledger</span>
                         </div>
                     </a>
                 </div>
 
                 <!-- Main Nav Links -->
-                <nav class="hidden md:flex items-center space-x-1 lg:space-x-2">
+                <nav class="hidden md:flex items-center space-x-1">
+                    <!-- Executive Dashboard -->
+                    <a href="{{ route('dashboard') }}" 
+                       class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('dashboard') ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                        <i class="fa-solid fa-gauge-high {{ request()->routeIs('dashboard') ? 'text-white' : 'text-emerald-400' }}"></i>
+                        <span>Dashboard</span>
+                    </a>
+
                     <!-- POS Terminal -->
                     <a href="{{ route('pos.index') }}" 
-                       class="px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ request()->routeIs('pos.*') ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
-                        <i class="fa-solid fa-cash-register text-emerald-400"></i>
+                       class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('pos.*') ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                        <i class="fa-solid fa-cash-register {{ request()->routeIs('pos.*') ? 'text-white' : 'text-emerald-400' }}"></i>
                         <span>POS Counter</span>
-                        <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">F2/F8</span>
+                        <span class="hidden 2xl:inline text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">F2/F8</span>
                     </a>
 
                     <!-- Master Data (Admin Only) -->
                     @if(auth()->user()->isAdmin())
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
-                                class="px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {{ request()->routeIs('master.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                                class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('master.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                             <i class="fa-solid fa-boxes-stacked"></i>
                             <span>Master Data</span>
-                            <i class="fa-solid fa-chevron-down text-xs transition-transform" :class="{ 'rotate-180': open }"></i>
+                            <i class="fa-solid fa-chevron-down text-[10px] transition-transform" :class="{ 'rotate-180': open }"></i>
                         </button>
                         <div x-show="open" x-cloak
                              class="absolute left-0 mt-2 w-56 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 text-sm">
@@ -127,10 +134,10 @@
                     <!-- GRN Procurement (Admin Only) -->
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
-                                class="px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {{ request()->routeIs('grn.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                                class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('grn.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                             <i class="fa-solid fa-truck-ramp-box"></i>
-                            <span>GRN / Procurement</span>
-                            <i class="fa-solid fa-chevron-down text-xs transition-transform" :class="{ 'rotate-180': open }"></i>
+                            <span>GRN</span>
+                            <i class="fa-solid fa-chevron-down text-[10px] transition-transform" :class="{ 'rotate-180': open }"></i>
                         </button>
                         <div x-show="open" x-cloak
                              class="absolute left-0 mt-2 w-60 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 text-sm">
@@ -149,27 +156,27 @@
 
                     <!-- Customers & Lending (Cashier & Admin) -->
                     <a href="{{ route('customers.index') }}" 
-                       class="px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {{ request()->routeIs('customers.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                       class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('customers.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                         <i class="fa-solid fa-users"></i>
-                        <span>Customers & Lending</span>
+                        <span>Customers</span>
                     </a>
 
                     <!-- Suppliers & AP (Admin Only) -->
                     @if(auth()->user()->isAdmin())
                     <a href="{{ route('suppliers.index') }}" 
-                       class="px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {{ request()->routeIs('suppliers.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                       class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('suppliers.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                         <i class="fa-solid fa-building-wheat"></i>
-                        <span>Suppliers & AP</span>
+                        <span>Suppliers</span>
                     </a>
                     @endif
 
                     <!-- Reports Hub (Exact 11 Reports) -->
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
-                                class="px-3 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 {{ request()->routeIs('reports.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                                class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('reports.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                             <i class="fa-solid fa-chart-line text-emerald-400"></i>
                             <span>Reports</span>
-                            <i class="fa-solid fa-chevron-down text-xs transition-transform" :class="{ 'rotate-180': open }"></i>
+                            <i class="fa-solid fa-chevron-down text-[10px] transition-transform" :class="{ 'rotate-180': open }"></i>
                         </button>
                         <div x-show="open" x-cloak
                              class="absolute right-0 mt-2 w-72 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 text-sm max-h-[85vh] overflow-y-auto divide-y divide-slate-800">
@@ -227,16 +234,16 @@
                     </div>
                 </nav>
 
-                <!-- User & Quick Role Switcher -->
-                <div class="flex items-center space-x-3">
+                <!-- User, Role Switcher & Prominent Logout -->
+                <div class="flex items-center space-x-2 shrink-0">
                     <!-- User Profile & Shift -->
-                    <div class="flex items-center space-x-3 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/80">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs {{ auth()->user()->isAdmin() ? 'bg-purple-600 text-white' : 'bg-emerald-600 text-white' }}">
+                    <div class="flex items-center space-x-2 bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-700/80">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] {{ auth()->user()->isAdmin() ? 'bg-purple-600 text-white' : 'bg-emerald-600 text-white' }}">
                             {{ auth()->user()->isAdmin() ? 'ADM' : 'CSH' }}
                         </div>
-                        <div class="text-left hidden lg:block">
-                            <div class="text-xs font-semibold text-white leading-tight">{{ auth()->user()->name }}</div>
-                            <div class="text-[10px] text-emerald-400 uppercase tracking-wider font-mono font-medium">{{ auth()->user()->role->label }}</div>
+                        <div class="text-left hidden xl:block">
+                            <div class="text-xs font-semibold text-white leading-tight truncate max-w-[110px]">{{ auth()->user()->name }}</div>
+                            <div class="text-[9px] text-emerald-400 uppercase tracking-wider font-mono font-medium">{{ auth()->user()->role->label }}</div>
                         </div>
 
                         <!-- 1-Click Role Switcher Dropdown (Local XAMPP Testing) -->
@@ -258,11 +265,12 @@
                             </div>
                         </div>
 
-                        <!-- Logout -->
+                        <!-- Prominent Logout Button -->
                         <form method="POST" action="{{ route('logout') }}" class="inline">
                             @csrf
-                            <button type="submit" title="Logout" class="text-slate-400 hover:text-rose-400 p-1 rounded transition-colors text-xs">
-                                <i class="fa-solid fa-power-off"></i>
+                            <button type="submit" title="Logout" class="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 transition-all text-xs font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-power-off text-[11px]"></i>
+                                <span>Logout</span>
                             </button>
                         </form>
                     </div>
@@ -273,6 +281,7 @@
     </header>
 
     <!-- Global Alert Messages -->
+    @if(session('success') || session('error') || (isset($errors) && $errors->any()))
     <div class="no-print max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3">
         @if(session('success'))
         <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-3.5 text-sm text-emerald-800 flex items-center justify-between shadow-sm" x-data="{ show: true }" x-show="show">
@@ -307,6 +316,7 @@
         </div>
         @endif
     </div>
+    @endif
 
     <!-- Main Content Area -->
     <main class="flex-1 overflow-x-hidden">
