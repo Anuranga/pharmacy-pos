@@ -49,9 +49,12 @@ class FEFOAllocationService
             $batch->stock_quantity -= $deductQty;
             $batch->save();
 
-            $unitPrice = (float) $batch->selling_price > 0
-                ? (float) $batch->selling_price
-                : (float) ($overrideUnitPrice ?? $product?->unit_retail_price ?? 0);
+            // Current product price is the source of truth (reflects price adjustments immediately)
+            $unitPrice = (float) ($product?->unit_retail_price ?? 0) > 0
+                ? (float) $product->unit_retail_price
+                : ((float) $batch->selling_price > 0
+                    ? (float) $batch->selling_price
+                    : (float) ($overrideUnitPrice ?? 0));
             $costPrice = (float) $batch->purchase_cost > 0
                 ? (float) $batch->purchase_cost
                 : (float) ($product?->unit_cost_price ?? 0);
@@ -116,9 +119,11 @@ class FEFOAllocationService
                     ]);
                 }
 
-                $unitPrice = (float) $fallbackBatch->selling_price > 0
-                    ? (float) $fallbackBatch->selling_price
-                    : (float) ($overrideUnitPrice ?? $product?->unit_retail_price ?? 0);
+                $unitPrice = (float) ($product?->unit_retail_price ?? 0) > 0
+                    ? (float) $product->unit_retail_price
+                    : ((float) $fallbackBatch->selling_price > 0
+                        ? (float) $fallbackBatch->selling_price
+                        : (float) ($overrideUnitPrice ?? 0));
                 $costPrice = (float) $fallbackBatch->purchase_cost > 0
                     ? (float) $fallbackBatch->purchase_cost
                     : (float) ($product?->unit_cost_price ?? 0);

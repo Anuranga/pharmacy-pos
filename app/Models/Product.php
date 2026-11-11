@@ -83,11 +83,20 @@ class Product extends Model
             return $query;
         }
 
-        return $query->where(function ($q) use ($term) {
-            $q->where('barcode_sku', 'like', "%{$term}%")
-              ->orWhere('brand_name', 'like', "%{$term}%")
-              ->orWhere('generic_name', 'like', "%{$term}%");
-        });
+        // Multi-word partial search: every word must match somewhere (e.g. "Li sha" => "Lifebuoy Shampoo")
+        $words = preg_split('/\s+/', trim($term), -1, PREG_SPLIT_NO_EMPTY);
+
+        foreach ($words as $word) {
+            $like = '%' . addcslashes($word, '%_\\') . '%';
+            $query->where(function ($q) use ($like) {
+                $q->where('barcode_sku', 'like', $like)
+                  ->orWhere('brand_name', 'like', $like)
+                  ->orWhere('generic_name', 'like', $like)
+                  ->orWhere('dosage_strength', 'like', $like);
+            });
+        }
+
+        return $query;
     }
 
     public function scopeLowStock($query)

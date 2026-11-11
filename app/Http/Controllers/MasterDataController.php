@@ -142,6 +142,11 @@ class MasterDataController extends Controller
 
         $product->update($validated);
 
+        // Propagate price adjustments to all existing batches so POS/reports stay consistent
+        $product->batches()->update([
+            'selling_price' => $validated['unit_retail_price'],
+        ]);
+
         return redirect()->route('master.products.show', $product->id)
             ->with('success', "Medication '{$product->brand_name}' updated successfully.");
     }

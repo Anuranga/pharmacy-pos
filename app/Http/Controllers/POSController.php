@@ -66,6 +66,18 @@ class POSController extends Controller
 
             if (!empty($term)) {
                 $query->search($term);
+
+                // Relevance ranking: brand starting with the first typed word, then word-start matches
+                $words = preg_split('/\s+/', $term, -1, PREG_SPLIT_NO_EMPTY);
+                $first = addcslashes($words[0] ?? $term, '%_\\');
+                $query->orderByRaw(
+                    "CASE
+                        WHEN brand_name LIKE ? THEN 0
+                        WHEN brand_name LIKE ? THEN 1
+                        ELSE 2
+                     END",
+                    [$first . '%', '% ' . $first . '%']
+                )->orderBy('brand_name');
             }
 
             if (!empty($categoryId)) {
@@ -78,9 +90,10 @@ class POSController extends Controller
         $formatted = $products->map(function ($product) {
             $batches = $product->activeBatches;
             $earliestBatch = $batches->first();
-            $retailPrice = ($earliestBatch && (float) $earliestBatch->selling_price > 0)
-                ? (float) $earliestBatch->selling_price
-                : (float) $product->unit_retail_price;
+            // Current product price is the source of truth so price adjustments show instantly
+            $retailPrice = (float) $product->unit_retail_price > 0
+                ? (float) $product->unit_retail_price
+                : (float) ($earliestBatch->selling_price ?? 0);
             $costPrice = ($earliestBatch && (float) $earliestBatch->purchase_cost > 0)
                 ? (float) $earliestBatch->purchase_cost
                 : (float) $product->unit_cost_price;
@@ -139,9 +152,9 @@ class POSController extends Controller
         $batches = $product->activeBatches;
         $totalStock = (int) $batches->sum('stock_quantity');
         $earliestBatch = $batches->first();
-        $retailPrice = ($earliestBatch && (float) $earliestBatch->selling_price > 0)
-            ? (float) $earliestBatch->selling_price
-            : (float) $product->unit_retail_price;
+        $retailPrice = (float) $product->unit_retail_price > 0
+            ? (float) $product->unit_retail_price
+            : (float) ($earliestBatch->selling_price ?? 0);
 
         return response()->json([
             'success' => true,
