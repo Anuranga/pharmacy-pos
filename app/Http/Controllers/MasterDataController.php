@@ -140,12 +140,21 @@ class MasterDataController extends Controller
         $validated['requires_prescription'] = $request->boolean('requires_prescription');
         $validated['is_controlled'] = $request->boolean('is_controlled');
 
+        $oldRetailPrice = (float) $product->unit_retail_price;
         $product->update($validated);
 
-        // Propagate price adjustments to all existing batches so POS/reports stay consistent
-        $product->batches()->update([
-            'selling_price' => $validated['unit_retail_price'],
-        ]);
+        // Update batches that shared the old master price (or when only 1 batch exists), preserving distinct multi-batch prices
+        if ($product->batches()->count() <= 1) {
+            $product->batches()->update([
+                'selling_price' => $validated['unit_retail_price'],
+            ]);
+        } elseif (abs($oldRetailPrice - (float) $validated['unit_retail_price']) >= 0.005) {
+            $product->batches()
+                ->where('selling_price', $oldRetailPrice)
+                ->update([
+                    'selling_price' => $validated['unit_retail_price'],
+                ]);
+        }
 
         return redirect()->route('master.products.show', $product->id)
             ->with('success', "Medication '{$product->brand_name}' updated successfully.");

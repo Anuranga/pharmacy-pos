@@ -157,6 +157,10 @@
                                 </div>
                                 
                                 <div class="flex items-center gap-1">
+                                    <template x-if="product.price_options && product.price_options.length > 1">
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300"
+                                              x-text="product.price_options.length + ' Batch Prices'"></span>
+                                    </template>
                                     <template x-if="product.requires_prescription">
                                         <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 uppercase tracking-wider">Rx</span>
                                     </template>
@@ -176,10 +180,14 @@
                             <!-- Stock & FEFO Batch Badge -->
                             <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
                                 <div>
-                                    <div class="flex items-baseline gap-1">
+                                    <div class="flex items-baseline gap-1 flex-wrap">
                                         <span class="font-display font-bold text-sm text-emerald-700" x-text="'Rs. ' + parseFloat(product.retail_price).toFixed(2)"></span>
                                         <span class="text-[9px] text-slate-400 font-mono" x-text="'/' + (product.base_uom || 'Unit')"></span>
                                     </div>
+                                    <template x-if="product.price_options && product.price_options.length > 1">
+                                        <div class="text-[10px] font-mono font-semibold text-amber-700"
+                                             x-text="'Batches: ' + product.price_options.map(o => 'Rs.' + parseFloat(o.price).toFixed(0)).join(' / ')"></div>
+                                    </template>
                                     <template x-if="product.units_per_pack > 1">
                                         <div class="text-[10px] font-mono font-semibold text-indigo-600"
                                              x-text="'Pack (' + product.units_per_pack + '): Rs. ' + (parseFloat(product.retail_price) * product.units_per_pack).toFixed(2)"></div>
@@ -320,7 +328,7 @@
                 </template>
 
                 <div class="space-y-1.5">
-                    <template x-for="(item, index) in cart" :key="item.product_id + '-' + item.sell_unit">
+                    <template x-for="(item, index) in cart" :key="item.product_id + '-' + item.sell_unit + '-' + item.base_unit_price">
                         <div class="bg-slate-50 hover:bg-emerald-50/30 border border-slate-200/90 rounded-xl px-2.5 py-1.5 flex flex-col gap-1 text-xs transition-colors">
                             <div class="flex items-center justify-between gap-2">
                                 <!-- Item info -->
@@ -339,8 +347,29 @@
                                             <span class="text-indigo-700 font-bold bg-indigo-100/80 px-1.5 py-0.2 rounded border border-indigo-200"
                                                   x-text="'= ' + (item.quantity * item.units_per_pack) + ' ' + (item.base_uom || 'Tab')"></span>
                                         </template>
-                                        <span class="text-emerald-700 font-semibold bg-emerald-100/60 px-1 rounded">FEFO: <span x-text="item.earliest_expiry || 'Active'"></span></span>
+                                        <span class="text-emerald-700 font-semibold bg-emerald-100/60 px-1 rounded">
+                                            Batch: <span x-text="item.selected_batch_no || item.earliest_batch_no || 'Active'"></span>
+                                        </span>
                                     </div>
+
+                                    <!-- Multi-Batch Price Selector Pills (shown when item has multiple batch prices) -->
+                                    <template x-if="item.price_options && item.price_options.length > 1">
+                                        <div class="mt-1 flex items-center flex-wrap gap-1">
+                                            <span class="text-[9px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-0.5">
+                                                <i class="fa-solid fa-tags text-[8px]"></i> Batch Price:
+                                            </span>
+                                            <template x-for="opt in item.price_options" :key="opt.price + '-' + opt.batch_id">
+                                                <button type="button"
+                                                        @click="setItemBatchPrice(index, opt)"
+                                                        :class="Math.abs(item.base_unit_price - opt.price) < 0.005 ? 'bg-amber-600 text-white font-bold border-amber-600 shadow-2xs' : 'bg-white text-slate-700 hover:bg-amber-50 border-slate-300'"
+                                                        class="px-1.5 py-0.5 rounded-md border text-[10px] font-mono transition-all"
+                                                        :title="'Batch: ' + opt.batch_number + ' | Stock: ' + opt.stock_quantity + (opt.expiry_date ? ' | Exp: ' + opt.expiry_date : '')">
+                                                    <span x-text="'Rs. ' + (item.sell_unit === 'pack' ? (opt.price * item.units_per_pack) : opt.price).toFixed(2)"></span>
+                                                    <span class="text-[8px] opacity-80" x-text="'(' + opt.batch_number + ')'"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </template>
                                 </div>
 
                                 <!-- Inline Pack vs Unit Switcher (when units_per_pack > 1) -->
@@ -701,6 +730,59 @@
         </div>
     </div>
 
+    <!-- MODAL 4: Multi-Batch Price Selection Modal -->
+    <div x-show="openBatchPriceModal" x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200" @click.outside="openBatchPriceModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="font-display font-bold text-base text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-tags text-amber-600"></i>
+                        <span>Select Batch Price</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Multiple batch prices found for <strong class="text-slate-800" x-text="pendingPriceProduct ? pendingPriceProduct.brand_name : ''"></strong>
+                    </p>
+                </div>
+                <button @click="openBatchPriceModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+
+            <div class="mt-3 space-y-2 max-h-72 overflow-y-auto" x-show="pendingPriceProduct">
+                <template x-for="(opt, idx) in (pendingPriceProduct ? pendingPriceProduct.price_options : [])" :key="opt.price + '-' + opt.batch_id + '-' + idx">
+                    <button type="button"
+                            @click="confirmBatchPriceSelection(opt)"
+                            class="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition-all flex items-center justify-between group">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-slate-800 font-mono bg-slate-100 group-hover:bg-white px-2 py-0.5 rounded border border-slate-200"
+                                      x-text="'Batch: ' + (opt.batch_number || 'Default')"></span>
+                                <span class="text-[11px] font-semibold"
+                                      :class="opt.stock_quantity > 0 ? 'text-emerald-700' : 'text-rose-600'"
+                                      x-text="'Stock: ' + opt.stock_quantity + ' ' + (pendingPriceProduct?.base_uom || 'Units')"></span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 font-mono mt-1" x-show="opt.expiry_date">
+                                Expiry: <span x-text="opt.expiry_date"></span>
+                            </div>
+                        </div>
+
+                        <div class="text-right">
+                            <div class="font-display font-black text-base text-emerald-700 group-hover:text-emerald-800 font-mono"
+                                 x-text="'Rs. ' + (pendingPriceUnit === 'pack' && pendingPriceProduct?.units_per_pack > 1 ? (opt.price * pendingPriceProduct.units_per_pack) : opt.price).toFixed(2)">
+                            </div>
+                            <div class="text-[10px] text-slate-500 font-mono"
+                                 x-text="'per ' + (pendingPriceUnit === 'pack' && pendingPriceProduct?.units_per_pack > 1 ? ('Pack of ' + pendingPriceProduct.units_per_pack) : (pendingPriceProduct?.base_uom || 'Unit'))">
+                            </div>
+                        </div>
+                    </button>
+                </template>
+            </div>
+
+            <div class="flex justify-end mt-4 pt-2 border-t border-slate-100">
+                <button type="button" @click="openBatchPriceModal = false" class="px-3 py-1.5 text-xs border rounded-lg text-slate-600 hover:bg-slate-50">Cancel</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -730,6 +812,9 @@ function posTerminal() {
         openQuickCreateModal: false,
         openCustomerModal: false,
         showReceiptModal: false,
+        openBatchPriceModal: false,
+        pendingPriceProduct: null,
+        pendingPriceUnit: null,
         currentReceiptUrl: '',
 
         quickForm: {
@@ -776,6 +861,10 @@ function posTerminal() {
         },
 
         handleEscape() {
+            if (this.openBatchPriceModal) {
+                this.openBatchPriceModal = false;
+                return;
+            }
             if (this.openQuickCreateModal) {
                 this.openQuickCreateModal = false;
                 return;
@@ -869,17 +958,35 @@ function posTerminal() {
             }
         },
 
-        addToCart(product, preferredUnit = null) {
+        addToCart(product, preferredUnit = null, selectedPriceOption = null) {
             const unitsPerPack = Math.max(1, parseInt(product.units_per_pack) || 1);
             const targetUnit = (preferredUnit === 'pack' && unitsPerPack > 1) ? 'pack' : 'unit';
+            const priceOptions = Array.isArray(product.price_options) ? product.price_options : [];
 
-            // Look for an existing cart entry with the same product_id and sell_unit
-            const existingIndex = this.cart.findIndex(i => i.product_id === product.id && i.sell_unit === targetUnit);
+            // If product has multiple distinct batch prices and user hasn't picked one yet, prompt selection
+            if (!selectedPriceOption && priceOptions.length > 1) {
+                this.pendingPriceProduct = product;
+                this.pendingPriceUnit = targetUnit;
+                this.openBatchPriceModal = true;
+                return;
+            }
+
+            const chosenOption = selectedPriceOption || (priceOptions.length === 1 ? priceOptions[0] : null);
+            const basePrice = chosenOption
+                ? (parseFloat(chosenOption.price) || 0)
+                : (parseFloat(product.retail_price) || 0);
+            const selectedBatchId = chosenOption ? (chosenOption.batch_id || null) : null;
+            const selectedBatchNo = chosenOption ? (chosenOption.batch_number || product.earliest_batch_no) : product.earliest_batch_no;
+            const selectedExpiry = (chosenOption && chosenOption.expiry_date) ? chosenOption.expiry_date : product.earliest_expiry;
+
+            // Look for an existing cart entry with the same product_id, sell_unit, and base_unit_price
+            const existingIndex = this.cart.findIndex(
+                i => i.product_id === product.id && i.sell_unit === targetUnit && Math.abs(i.base_unit_price - basePrice) < 0.005
+            );
 
             if (existingIndex > -1) {
                 this.cart[existingIndex].quantity++;
             } else {
-                const basePrice = parseFloat(product.retail_price) || 0;
                 this.cart.push({
                     product_id: product.id,
                     brand_name: product.brand_name,
@@ -889,15 +996,53 @@ function posTerminal() {
                     sell_unit: targetUnit,
                     base_unit_price: basePrice,
                     unit_price: basePrice,
+                    price_options: priceOptions,
+                    selected_batch_id: selectedBatchId,
+                    selected_batch_no: selectedBatchNo,
                     quantity: 1,
                     total_stock: product.total_stock,
-                    earliest_expiry: product.earliest_expiry,
+                    earliest_expiry: selectedExpiry,
+                    earliest_batch_no: product.earliest_batch_no,
                     requires_prescription: product.requires_prescription,
                     is_controlled: product.is_controlled,
                 });
             }
 
             this.focusBarcode();
+        },
+
+        confirmBatchPriceSelection(option) {
+            if (!this.pendingPriceProduct) return;
+            const prod = this.pendingPriceProduct;
+            const unit = this.pendingPriceUnit;
+            this.openBatchPriceModal = false;
+            this.pendingPriceProduct = null;
+            this.pendingPriceUnit = null;
+            this.addToCart(prod, unit, option);
+        },
+
+        setItemBatchPrice(index, option) {
+            const item = this.cart[index];
+            if (!item || !option) return;
+            const newPrice = parseFloat(option.price) || 0;
+            if (Math.abs(item.base_unit_price - newPrice) < 0.005) return;
+
+            // Check if another cart line already exists for this product + sell_unit + newPrice
+            const duplicateIndex = this.cart.findIndex(
+                (c, idx) => idx !== index && c.product_id === item.product_id && c.sell_unit === item.sell_unit && Math.abs(c.base_unit_price - newPrice) < 0.005
+            );
+            if (duplicateIndex > -1) {
+                this.cart[duplicateIndex].quantity += item.quantity;
+                this.cart.splice(index, 1);
+            } else {
+                item.base_unit_price = newPrice;
+                item.unit_price = newPrice;
+                item.selected_batch_id = option.batch_id || null;
+                item.selected_batch_no = option.batch_number || item.earliest_batch_no;
+                if (option.expiry_date) {
+                    item.earliest_expiry = option.expiry_date;
+                }
+            }
         },
 
         getItemActiveUnitPrice(item) {
@@ -912,8 +1057,10 @@ function posTerminal() {
             const targetMode = (unitMode === 'pack' && item.units_per_pack > 1) ? 'pack' : 'unit';
             if (item.sell_unit === targetMode) return;
 
-            // Check if another cart line already exists for this product + targetMode
-            const duplicateIndex = this.cart.findIndex((c, idx) => idx !== index && c.product_id === item.product_id && c.sell_unit === targetMode);
+            // Check if another cart line already exists for this product + targetMode + same price
+            const duplicateIndex = this.cart.findIndex(
+                (c, idx) => idx !== index && c.product_id === item.product_id && c.sell_unit === targetMode && Math.abs(c.base_unit_price - item.base_unit_price) < 0.005
+            );
             if (duplicateIndex > -1) {
                 this.cart[duplicateIndex].quantity += item.quantity;
                 this.cart.splice(index, 1);
@@ -1020,6 +1167,7 @@ function posTerminal() {
                     product_id: i.product_id,
                     quantity: i.sell_unit === 'pack' ? (i.quantity * i.units_per_pack) : i.quantity,
                     unit_price: i.base_unit_price,
+                    batch_id: i.selected_batch_id || null,
                 })),
                 customer_id: this.selectedCustomerId || null,
                 payment_type: this.paymentType,

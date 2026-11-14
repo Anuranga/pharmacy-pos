@@ -87,43 +87,95 @@ class POSController extends Controller
             $products = $query->limit(30)->get();
         }
 
-        $formatted = $products->map(function ($product) {
-            $batches = $product->activeBatches;
-            $earliestBatch = $batches->first();
-            // Current product price is the source of truth so price adjustments show instantly
-            $retailPrice = (float) $product->unit_retail_price > 0
-                ? (float) $product->unit_retail_price
-                : (float) ($earliestBatch->selling_price ?? 0);
-            $costPrice = ($earliestBatch && (float) $earliestBatch->purchase_cost > 0)
-                ? (float) $earliestBatch->purchase_cost
-                : (float) $product->unit_cost_price;
-
-            return [
-                'id' => $product->id,
-                'barcode_sku' => $product->barcode_sku,
-                'brand_name' => $product->brand_name,
-                'generic_name' => $product->generic_name ?? 'N/A',
-                'dosage_strength' => $product->dosage_strength ?? '',
-                'item_type' => $product->item_type,
-                'base_uom' => $product->base_uom,
-                'units_per_pack' => max(1, (int) ($product->units_per_pack ?? 1)),
-                'requires_prescription' => (bool) $product->requires_prescription,
-                'is_controlled' => (bool) $product->is_controlled,
-                'retail_price' => $retailPrice,
-                'cost_price' => $costPrice,
-                'total_stock' => (int) $batches->sum('stock_quantity'),
-                'batches_count' => $batches->count(),
-                'earliest_expiry' => $earliestBatch ? $earliestBatch->expiry_date->format('Y-m-d') : null,
-                'earliest_batch_no' => $earliestBatch ? $earliestBatch->batch_number : null,
-                'category_name' => $product->category ? $product->category->name : 'General',
-            ];
-        });
+        $formatted = $products->map(fn($product) => $this->formatProductForPos($product));
 
         return response()->json([
             'success' => true,
             'count' => $formatted->count(),
             'products' => $formatted,
         ]);
+    }
+
+    /**
+     * Format a Product and its batch price options for the POS terminal.
+     */
+    protected function formatProductForPos(Product $product): array
+    {
+        $batches = $product->activeBatches ?? collect();
+        $earliestBatch = $batches->first();
+
+        // Collect batches to derive distinct price options (prefer positive-stock batches when available)
+        $positiveBatches = $batches->filter(fn($b) => (int) $b->stock_quantity > 0 && (float) $b->selling_price > 0);
+        $sourceBatches = $positiveBatches->isNotEmpty()
+            ? $positiveBatches
+            : $batches->filter(fn($b) => (float) $b->selling_price > 0);
+
+        $priceOptions = [];
+        foreach ($sourceBatches->groupBy(fn($b) => number_format((float) $b->selling_price, 2, '.', '')) as $priceKey => $group) {
+            $firstBatch = $group->first();
+            $priceOptions[] = [
+                'price' => (float) $priceKey,
+                'batch_id' => (int) $firstBatch->id,
+                'batch_number' => $group->pluck('batch_number')->unique()->implode(', '),
+                'stock_quantity' => (int) $group->sum('stock_quantity'),
+                'expiry_date' => $firstBatch->expiry_date ? $firstBatch->expiry_date->format('Y-m-d') : null,
+            ];
+        }
+
+        $masterPrice = (float) $product->unit_retail_price;
+        if ($masterPrice > 0) {
+            $hasMasterPrice = collect($priceOptions)->contains(fn($opt) => abs($opt['price'] - $masterPrice) < 0.005);
+            if (!$hasMasterPrice) {
+                array_unshift($priceOptions, [
+                    'price' => $masterPrice,
+                    'batch_id' => $earliestBatch ? (int) $earliestBatch->id : null,
+                    'batch_number' => $earliestBatch ? $earliestBatch->batch_number : 'Master',
+                    'stock_quantity' => (int) $batches->sum('stock_quantity'),
+                    'expiry_date' => $earliestBatch && $earliestBatch->expiry_date ? $earliestBatch->expiry_date->format('Y-m-d') : null,
+                ]);
+            }
+        }
+
+        if (empty($priceOptions)) {
+            $priceOptions[] = [
+                'price' => $masterPrice,
+                'batch_id' => null,
+                'batch_number' => 'Default',
+                'stock_quantity' => 0,
+                'expiry_date' => null,
+            ];
+        }
+
+        // Default retail price: if multiple batch prices exist, use the first (FEFO) batch option; otherwise master price
+        $retailPrice = count($priceOptions) > 1
+            ? (float) $priceOptions[0]['price']
+            : ($masterPrice > 0 ? $masterPrice : (float) ($earliestBatch->selling_price ?? 0));
+
+        $costPrice = ($earliestBatch && (float) $earliestBatch->purchase_cost > 0)
+            ? (float) $earliestBatch->purchase_cost
+            : (float) $product->unit_cost_price;
+
+        return [
+            'id' => $product->id,
+            'barcode_sku' => $product->barcode_sku,
+            'brand_name' => $product->brand_name,
+            'generic_name' => $product->generic_name ?? 'N/A',
+            'dosage_strength' => $product->dosage_strength ?? '',
+            'item_type' => $product->item_type,
+            'base_uom' => $product->base_uom,
+            'units_per_pack' => max(1, (int) ($product->units_per_pack ?? 1)),
+            'requires_prescription' => (bool) $product->requires_prescription,
+            'is_controlled' => (bool) $product->is_controlled,
+            'retail_price' => $retailPrice,
+            'cost_price' => $costPrice,
+            'price_options' => array_values($priceOptions),
+            'has_multiple_prices' => count($priceOptions) > 1,
+            'total_stock' => (int) $batches->sum('stock_quantity'),
+            'batches_count' => $batches->count(),
+            'earliest_expiry' => $earliestBatch && $earliestBatch->expiry_date ? $earliestBatch->expiry_date->format('Y-m-d') : null,
+            'earliest_batch_no' => $earliestBatch ? $earliestBatch->batch_number : null,
+            'category_name' => $product->category ? $product->category->name : 'General',
+        ];
     }
 
     /**
@@ -149,31 +201,9 @@ class POSController extends Controller
             ], 404);
         }
 
-        $batches = $product->activeBatches;
-        $totalStock = (int) $batches->sum('stock_quantity');
-        $earliestBatch = $batches->first();
-        $retailPrice = (float) $product->unit_retail_price > 0
-            ? (float) $product->unit_retail_price
-            : (float) ($earliestBatch->selling_price ?? 0);
-
         return response()->json([
             'success' => true,
-            'product' => [
-                'id' => $product->id,
-                'barcode_sku' => $product->barcode_sku,
-                'brand_name' => $product->brand_name,
-                'generic_name' => $product->generic_name ?? 'N/A',
-                'dosage_strength' => $product->dosage_strength ?? '',
-                'item_type' => $product->item_type,
-                'base_uom' => $product->base_uom,
-                'units_per_pack' => max(1, (int) ($product->units_per_pack ?? 1)),
-                'requires_prescription' => (bool) $product->requires_prescription,
-                'is_controlled' => (bool) $product->is_controlled,
-                'retail_price' => $retailPrice,
-                'total_stock' => $totalStock,
-                'earliest_expiry' => $earliestBatch ? $earliestBatch->expiry_date->format('Y-m-d') : null,
-                'earliest_batch_no' => $earliestBatch ? $earliestBatch->batch_number : null,
-            ],
+            'product' => $this->formatProductForPos($product),
         ]);
     }
 
@@ -227,25 +257,12 @@ class POSController extends Controller
                 'stock_quantity' => $validated['initial_stock'],
             ]);
 
+            $product->load(['activeBatches', 'category']);
+
             return response()->json([
                 'success' => true,
                 'message' => "Drug '{$product->brand_name}' created successfully.",
-                'product' => [
-                    'id' => $product->id,
-                    'barcode_sku' => $product->barcode_sku,
-                    'brand_name' => $product->brand_name,
-                    'generic_name' => $product->generic_name,
-                    'dosage_strength' => $product->dosage_strength,
-                    'item_type' => $product->item_type,
-                    'base_uom' => $product->base_uom,
-                    'units_per_pack' => (int) $product->units_per_pack,
-                    'requires_prescription' => (bool) $product->requires_prescription,
-                    'is_controlled' => (bool) $product->is_controlled,
-                    'retail_price' => (float) $batch->selling_price,
-                    'total_stock' => $batch->stock_quantity,
-                    'earliest_expiry' => $batch->expiry_date->format('Y-m-d'),
-                    'earliest_batch_no' => $batch->batch_number,
-                ]
+                'product' => $this->formatProductForPos($product),
             ]);
         });
     }
@@ -261,6 +278,7 @@ class POSController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_price' => 'nullable|numeric|min:0',
+            'items.*.batch_id' => 'nullable|integer',
             'customer_id' => 'nullable|exists:customers,id',
             'payment_type' => 'required|in:cash,card,qr,credit_lending,split',
             'amount_paid' => 'nullable|numeric|min:0',
@@ -311,8 +329,9 @@ class POSController extends Controller
                     $prodId = (int) $item['product_id'];
                     $qty = (int) $item['quantity'];
                     $overridePrice = isset($item['unit_price']) ? (float) $item['unit_price'] : null;
+                    $preferredBatchId = !empty($item['batch_id']) ? (int) $item['batch_id'] : null;
 
-                    $allocations = $this->fefoService->allocateAndDeduct($prodId, $qty, $overridePrice);
+                    $allocations = $this->fefoService->allocateAndDeduct($prodId, $qty, $overridePrice, $preferredBatchId);
                     foreach ($allocations as $alloc) {
                         $alloc['product_id'] = $prodId;
                         $allAllocations[] = $alloc;

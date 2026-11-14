@@ -17,10 +17,11 @@ class FEFOAllocationService
      * @param int $productId
      * @param int $quantity
      * @param float|null $overrideUnitPrice
+     * @param int|null $preferredBatchId
      * @return array Array of allocated items: [['batch_id', 'batch_number', 'expiry_date', 'quantity', 'cost_price', 'unit_price', 'subtotal']]
      * @throws Exception
      */
-    public function allocateAndDeduct(int $productId, int $quantity, ?float $overrideUnitPrice = null): array
+    public function allocateAndDeduct(int $productId, int $quantity, ?float $overrideUnitPrice = null, ?int $preferredBatchId = null): array
     {
         if ($quantity <= 0) {
             throw new Exception("Quantity to allocate must be greater than zero.");
@@ -37,6 +38,19 @@ class FEFOAllocationService
             ->lockForUpdate()
             ->get();
 
+        // Prioritize the batch matching the selected batch ID or selected batch price first (then FEFO)
+        if ($batches->count() > 1 && ($preferredBatchId !== null || ($overrideUnitPrice !== null && $overrideUnitPrice > 0))) {
+            $batches = $batches->sortBy(function ($b) use ($preferredBatchId, $overrideUnitPrice) {
+                if ($preferredBatchId !== null && (int) $b->id === (int) $preferredBatchId) {
+                    return '0_' . $b->expiry_date->format('Ymd');
+                }
+                if ($overrideUnitPrice !== null && abs((float) $b->selling_price - (float) $overrideUnitPrice) < 0.005) {
+                    return '1_' . $b->expiry_date->format('Ymd');
+                }
+                return '2_' . $b->expiry_date->format('Ymd');
+            })->values();
+        }
+
         $remainingToAllocate = $quantity;
         $allocations = [];
 
@@ -49,12 +63,12 @@ class FEFOAllocationService
             $batch->stock_quantity -= $deductQty;
             $batch->save();
 
-            // Current product price is the source of truth (reflects price adjustments immediately)
-            $unitPrice = (float) ($product?->unit_retail_price ?? 0) > 0
-                ? (float) $product->unit_retail_price
-                : ((float) $batch->selling_price > 0
-                    ? (float) $batch->selling_price
-                    : (float) ($overrideUnitPrice ?? 0));
+            // Use the transaction's selected unit price first, then product/batch price
+            $unitPrice = ($overrideUnitPrice !== null && (float) $overrideUnitPrice > 0)
+                ? (float) $overrideUnitPrice
+                : ((float) ($product?->unit_retail_price ?? 0) > 0
+                    ? (float) $product->unit_retail_price
+                    : (float) $batch->selling_price);
             $costPrice = (float) $batch->purchase_cost > 0
                 ? (float) $batch->purchase_cost
                 : (float) ($product?->unit_cost_price ?? 0);
@@ -119,11 +133,11 @@ class FEFOAllocationService
                     ]);
                 }
 
-                $unitPrice = (float) ($product?->unit_retail_price ?? 0) > 0
-                    ? (float) $product->unit_retail_price
-                    : ((float) $fallbackBatch->selling_price > 0
-                        ? (float) $fallbackBatch->selling_price
-                        : (float) ($overrideUnitPrice ?? 0));
+                $unitPrice = ($overrideUnitPrice !== null && (float) $overrideUnitPrice > 0)
+                    ? (float) $overrideUnitPrice
+                    : ((float) ($product?->unit_retail_price ?? 0) > 0
+                        ? (float) $product->unit_retail_price
+                        : (float) $fallbackBatch->selling_price);
                 $costPrice = (float) $fallbackBatch->purchase_cost > 0
                     ? (float) $fallbackBatch->purchase_cost
                     : (float) ($product?->unit_cost_price ?? 0);
