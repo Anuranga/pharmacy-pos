@@ -10,9 +10,15 @@
             <i class="fa-solid fa-arrow-left"></i> Back to GRN Register
         </a>
 
-        <button onclick="window.print()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2">
-            <i class="fa-solid fa-print"></i> Print Consignment Sheet
-        </button>
+        <div class="flex items-center gap-2">
+            <a href="{{ route('returns.supplier.create', ['grn_id' => $grn->id]) }}"
+               class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold rounded-xl text-xs flex items-center gap-2">
+                <i class="fa-solid fa-rotate-left"></i> Return GRN Items to Supplier
+            </a>
+            <button onclick="window.print()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center gap-2">
+                <i class="fa-solid fa-print"></i> Print Consignment Sheet
+            </button>
+        </div>
     </div>
 
     <div class="bg-white rounded-3xl p-8 border border-slate-200/90 shadow-sm space-y-6">

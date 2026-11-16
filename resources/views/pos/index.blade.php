@@ -39,6 +39,12 @@
             <div class="text-slate-600 hidden sm:block">
                 Cash Drawer: <span class="font-bold text-teal-600">Rs. {{ number_format($stats['today_cash'], 2) }}</span>
             </div>
+            <a href="{{ route('returns.customer.create') }}"
+               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold transition-colors"
+               title="Process Customer Bill Return">
+                <i class="fa-solid fa-rotate-left text-[9px]"></i>
+                <span>Bill Return</span>
+            </a>
             <button type="button"
                     @click="wideBilling = !wideBilling"
                     :class="wideBilling ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'"

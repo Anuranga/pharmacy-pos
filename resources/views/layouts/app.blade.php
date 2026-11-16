@@ -170,6 +170,31 @@
                     </a>
                     @endif
 
+                    <!-- Returns Hub (Customer Bill Returns & Shop GRN Returns) -->
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                        <button @click="open = !open" 
+                                class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('returns.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
+                            <i class="fa-solid fa-rotate-left text-amber-400"></i>
+                            <span>Returns</span>
+                            <i class="fa-solid fa-chevron-down text-[10px] transition-transform" :class="{ 'rotate-180': open }"></i>
+                        </button>
+                        <div x-show="open" x-cloak
+                             class="absolute left-0 mt-2 w-64 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 text-sm">
+                            <a href="{{ route('returns.customer.create') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-medium">
+                                <i class="fa-solid fa-receipt mr-2 text-emerald-400"></i> Customer Bill Return
+                            </a>
+                            @if(auth()->user()->isAdmin())
+                            <a href="{{ route('returns.supplier.create') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-medium">
+                                <i class="fa-solid fa-truck-ramp-box mr-2 text-indigo-400"></i> Shop GRN Return (Supplier)
+                            </a>
+                            @endif
+                            <div class="border-t border-slate-800 my-1"></div>
+                            <a href="{{ route('returns.index') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-medium">
+                                <i class="fa-solid fa-list-check mr-2 text-amber-400"></i> Returns Audit Register
+                            </a>
+                        </div>
+                    </div>
+
                     <!-- Reports Hub (Exact 11 Reports) -->
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 

@@ -7,6 +7,7 @@ use App\Http\Controllers\GRNController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\POSController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,22 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{customer}', [CustomerController::class, 'update'])->name('update');
         Route::post('/{customer}/settle', [CustomerController::class, 'settle'])->name('settle');
         Route::post('/{customer}/extra-payment', [CustomerController::class, 'extraPayment'])->name('extra-payment');
+    });
+
+    // Returns Hub: Customer Billed Returns & Shop GRN Returns
+    Route::prefix('returns')->name('returns.')->group(function () {
+        Route::get('/', [ReturnController::class, 'index'])->name('index');
+        Route::get('/customer/create', [ReturnController::class, 'createCustomerReturn'])->name('customer.create');
+        Route::get('/customer/lookup', [ReturnController::class, 'lookupSale'])->name('customer.lookup');
+        Route::post('/customer', [ReturnController::class, 'storeCustomerReturn'])->name('customer.store');
+        Route::get('/customer/{saleReturn}', [ReturnController::class, 'showCustomerReturn'])->name('customer.show');
+
+        Route::middleware(['role:admin'])->group(function () {
+            Route::get('/supplier/create', [ReturnController::class, 'createSupplierReturn'])->name('supplier.create');
+            Route::get('/supplier/lookup-grn', [ReturnController::class, 'lookupGrn'])->name('supplier.lookup-grn');
+            Route::post('/supplier', [ReturnController::class, 'storeSupplierReturn'])->name('supplier.store');
+            Route::get('/supplier/{purchaseReturn}', [ReturnController::class, 'showSupplierReturn'])->name('supplier.show');
+        });
     });
 
     // Cashier shift reconciliation & EOD

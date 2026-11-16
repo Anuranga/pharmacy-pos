@@ -46,4 +46,9 @@ class Grn extends Model
     {
         return $this->hasMany(SupplierPayment::class);
     }
+
+    public function purchaseReturns()
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
 }
