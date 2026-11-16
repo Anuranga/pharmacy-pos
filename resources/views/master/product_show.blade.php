@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6" 
-     x-data="{ adjustModal: false, selectedBatchId: '', batchNumber: '', currentStock: 0, newQuantity: 0, adjustReason: 'Audit Recount', adjustNotes: '' }">
+     x-data="{ adjustModal: false, selectedBatchId: '', batchNumber: '', currentStock: 0, newQuantity: 0, currentCost: 0, newCostPrice: 0, currentSelling: 0, newSellingPrice: 0, updateMasterPrice: false, adjustReason: 'Audit Recount', adjustNotes: '' }">
     
     <!-- Top Bar -->
     <div class="flex items-center justify-between">
@@ -97,7 +97,7 @@
                         <th class="py-3 px-4 text-right">Selling Price (Rs.)</th>
                         <th class="py-3 px-4 text-center">Batch Stock</th>
                         <th class="py-3 px-4">Supplier</th>
-                        <th class="py-3 px-4 text-right">Stock Adjustment</th>
+                        <th class="py-3 px-4 text-right">Stock & Price Adjustment</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
@@ -131,9 +131,9 @@
                         </td>
                         <td class="py-3 px-4 text-right">
                             <button type="button"
-                                    @click="adjustModal = true; selectedBatchId = {{ $batch->id }}; batchNumber = '{{ $batch->batch_number }}'; currentStock = {{ $batch->stock_quantity }}; newQuantity = {{ $batch->stock_quantity }};"
+                                    @click="adjustModal = true; selectedBatchId = {{ $batch->id }}; batchNumber = '{{ $batch->batch_number }}'; currentStock = {{ $batch->stock_quantity }}; newQuantity = {{ $batch->stock_quantity }}; currentCost = {{ (float) $batch->purchase_cost }}; newCostPrice = {{ (float) $batch->purchase_cost }}; currentSelling = {{ (float) $batch->selling_price }}; newSellingPrice = {{ (float) $batch->selling_price }}; updateMasterPrice = false;"
                                     class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold shadow-2xs transition-colors">
-                                <i class="fa-solid fa-sliders text-emerald-600 mr-1"></i> Adjust
+                                <i class="fa-solid fa-sliders text-emerald-600 mr-1"></i> Adjust Stock / Price
                             </button>
                         </td>
                     </tr>
@@ -188,14 +188,14 @@
     </div>
     @endif
 
-    <!-- MODAL: Admin Stock Adjustment with Mandatory Reason Logging -->
+    <!-- MODAL: Admin Batch Stock & Price Adjustment with Mandatory Reason Logging -->
     <div x-show="adjustModal" x-cloak 
          class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200" @click.outside="adjustModal = false">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                 <h3 class="font-display font-bold text-base text-slate-800 flex items-center gap-2">
                     <i class="fa-solid fa-sliders text-emerald-600"></i>
-                    <span>Inline Stock Adjustment (Admin)</span>
+                    <span>Batch Stock & Price Adjustment</span>
                 </h3>
                 <button @click="adjustModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
             </div>
@@ -204,10 +204,34 @@
                 @csrf
                 <input type="hidden" name="batch_id" :value="selectedBatchId">
 
-                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <div class="text-[11px] text-slate-500">Selected Batch:</div>
-                    <div class="font-bold font-mono text-sm text-slate-900" x-text="batchNumber"></div>
-                    <div class="text-[11px] text-slate-500 mt-1">Current Stock on Hand: <strong class="text-slate-800" x-text="currentStock + ' units'"></strong></div>
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="text-[11px] text-slate-500">Selected Batch:</div>
+                        <div class="font-bold font-mono text-sm text-slate-900" x-text="batchNumber"></div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[11px] text-slate-500">Current Stock: <strong class="text-slate-800 font-mono" x-text="currentStock + ' units'"></strong></div>
+                        <div class="text-[11px] text-slate-500">Current Price: <strong class="text-emerald-700 font-mono" x-text="'Rs. ' + parseFloat(currentSelling).toFixed(2)"></strong></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Batch Cost Price (Rs.) *</label>
+                        <input type="number" step="0.01" min="0" name="purchase_cost" x-model.number="newCostPrice" required
+                               class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg font-mono text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-emerald-800 mb-1">Batch Selling Price (Rs.) *</label>
+                        <input type="number" step="0.01" min="0" name="selling_price" x-model.number="newSellingPrice" required
+                               class="w-full px-2.5 py-1.5 bg-white border border-emerald-400 rounded-lg font-mono text-xs font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div class="col-span-2 pt-1">
+                        <label class="flex items-center gap-2 cursor-pointer text-[11px] font-semibold text-slate-700">
+                            <input type="checkbox" name="update_master_price" value="1" x-model="updateMasterPrice" class="rounded text-emerald-600">
+                            <span>Also update item's default Master Retail & Cost Price</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div>

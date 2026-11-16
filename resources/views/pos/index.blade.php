@@ -328,7 +328,7 @@
                 </template>
 
                 <div class="space-y-1.5">
-                    <template x-for="(item, index) in cart" :key="item.product_id + '-' + item.sell_unit + '-' + item.base_unit_price">
+                    <template x-for="(item, index) in cart" :key="item.cart_line_id">
                         <div class="bg-slate-50 hover:bg-emerald-50/30 border border-slate-200/90 rounded-xl px-2.5 py-1.5 flex flex-col gap-1 text-xs transition-colors">
                             <div class="flex items-center justify-between gap-2">
                                 <!-- Item info -->
@@ -339,9 +339,16 @@
                                         <span class="text-[9px] bg-slate-200 text-slate-700 px-1 py-0.2 rounded font-mono shrink-0" x-text="item.item_type"></span>
                                     </div>
                                     <div class="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center flex-wrap gap-1.5">
-                                        <span class="font-semibold text-slate-700">
-                                            Rs. <span x-text="getItemActiveUnitPrice(item).toFixed(2)"></span>
-                                            /<span x-text="item.sell_unit === 'pack' ? ('Pack of ' + item.units_per_pack) : (item.base_uom || 'Unit')"></span>
+                                        <span class="font-semibold text-slate-700 inline-flex items-center gap-1">
+                                            <span>Rs.</span>
+                                            <input type="number"
+                                                   step="0.01"
+                                                   min="0"
+                                                   :value="getItemActiveUnitPrice(item)"
+                                                   @input="updateItemCustomPrice(index, $event.target.value)"
+                                                   title="Adjust selling price for this transaction"
+                                                   class="w-16 h-5 px-1 bg-white border border-slate-300 rounded text-[11px] font-bold font-mono text-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                                            <span>/<span x-text="item.sell_unit === 'pack' ? ('Pack of ' + item.units_per_pack) : (item.base_uom || 'Unit')"></span></span>
                                         </span>
                                         <template x-if="item.sell_unit === 'pack'">
                                             <span class="text-indigo-700 font-bold bg-indigo-100/80 px-1.5 py-0.2 rounded border border-indigo-200"
@@ -988,6 +995,7 @@ function posTerminal() {
                 this.cart[existingIndex].quantity++;
             } else {
                 this.cart.push({
+                    cart_line_id: product.id + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
                     product_id: product.id,
                     brand_name: product.brand_name,
                     item_type: product.item_type,
@@ -1049,6 +1057,16 @@ function posTerminal() {
             const basePrice = parseFloat(item.base_unit_price) || 0;
             const packSize = Math.max(1, parseInt(item.units_per_pack) || 1);
             return item.sell_unit === 'pack' ? (basePrice * packSize) : basePrice;
+        },
+
+        updateItemCustomPrice(index, rawValue) {
+            const item = this.cart[index];
+            if (!item) return;
+            const val = Math.max(0, parseFloat(rawValue) || 0);
+            const packSize = Math.max(1, parseInt(item.units_per_pack) || 1);
+            const newBasePrice = item.sell_unit === 'pack' ? (val / packSize) : val;
+            item.base_unit_price = newBasePrice;
+            item.unit_price = newBasePrice;
         },
 
         setItemSellUnit(index, unitMode) {

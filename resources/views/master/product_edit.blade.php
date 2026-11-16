@@ -199,8 +199,14 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1">
-                    <div class="md:col-start-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-1 items-center">
+                    <div class="md:col-span-3">
+                        <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 bg-white px-3 py-2 rounded-xl border border-slate-200">
+                            <input type="checkbox" name="apply_price_to_all_batches" value="1" class="rounded text-emerald-600 focus:ring-emerald-500">
+                            <span>Apply this new Retail Price to <strong>all existing inventory batches</strong> of this item</span>
+                        </label>
+                    </div>
+                    <div>
                         <label class="block font-semibold text-emerald-800 mb-1">Unit Retail Price (Rs.) <span class="text-rose-500">*</span></label>
                         <input type="number" step="0.01" min="0" name="unit_retail_price" 
                                x-model.number="retailPrice"

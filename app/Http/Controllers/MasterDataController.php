@@ -74,15 +74,18 @@ class MasterDataController extends Controller
             'item_type' => 'required|string|max:50',
             'category_id' => 'nullable|exists:categories,id',
             'base_uom' => 'required|string|max:30',
-            'units_per_pack' => 'required|integer|min:1',
-            'reorder_min' => 'required|integer|min:0',
-            'reorder_max' => 'required|integer|min:0',
+            'units_per_pack' => 'nullable|integer|min:1',
+            'reorder_min' => 'nullable|integer|min:0',
+            'reorder_max' => 'nullable|integer|min:0',
             'unit_cost_price' => 'required|numeric|min:0',
             'unit_retail_price' => 'required|numeric|min:0',
             'requires_prescription' => 'nullable|boolean',
             'is_controlled' => 'nullable|boolean',
         ]);
 
+        $validated['units_per_pack'] = max(1, (int) ($validated['units_per_pack'] ?? 1));
+        $validated['reorder_min'] = (int) ($validated['reorder_min'] ?? 10);
+        $validated['reorder_max'] = (int) ($validated['reorder_max'] ?? 100);
         $validated['requires_prescription'] = $request->boolean('requires_prescription');
         $validated['is_controlled'] = $request->boolean('is_controlled');
 
@@ -128,23 +131,26 @@ class MasterDataController extends Controller
             'item_type' => 'required|string|max:50',
             'category_id' => 'nullable|exists:categories,id',
             'base_uom' => 'required|string|max:30',
-            'units_per_pack' => 'required|integer|min:1',
-            'reorder_min' => 'required|integer|min:0',
-            'reorder_max' => 'required|integer|min:0',
+            'units_per_pack' => 'nullable|integer|min:1',
+            'reorder_min' => 'nullable|integer|min:0',
+            'reorder_max' => 'nullable|integer|min:0',
             'unit_cost_price' => 'required|numeric|min:0',
             'unit_retail_price' => 'required|numeric|min:0',
             'requires_prescription' => 'nullable|boolean',
             'is_controlled' => 'nullable|boolean',
         ]);
 
+        $validated['units_per_pack'] = max(1, (int) ($validated['units_per_pack'] ?? $product->units_per_pack ?? 1));
+        $validated['reorder_min'] = (int) ($validated['reorder_min'] ?? $product->reorder_min ?? 10);
+        $validated['reorder_max'] = (int) ($validated['reorder_max'] ?? $product->reorder_max ?? 100);
         $validated['requires_prescription'] = $request->boolean('requires_prescription');
         $validated['is_controlled'] = $request->boolean('is_controlled');
 
         $oldRetailPrice = (float) $product->unit_retail_price;
         $product->update($validated);
 
-        // Update batches that shared the old master price (or when only 1 batch exists), preserving distinct multi-batch prices
-        if ($product->batches()->count() <= 1) {
+        // Update all batches if requested, or update batches sharing the old master price (or when only 1 batch exists)
+        if ($request->boolean('apply_price_to_all_batches') || $product->batches()->count() <= 1) {
             $product->batches()->update([
                 'selling_price' => $validated['unit_retail_price'],
             ]);
@@ -207,13 +213,16 @@ class MasterDataController extends Controller
     }
 
     /**
-     * Quick inline stock adjustment for Admins with mandatory reason logging.
+     * Quick inline stock & batch price adjustment for Admins with mandatory reason logging.
      */
     public function adjustStock(Request $request)
     {
         $validated = $request->validate([
             'batch_id' => 'required|exists:product_batches,id',
             'new_quantity' => 'required|integer',
+            'selling_price' => 'nullable|numeric|min:0',
+            'purchase_cost' => 'nullable|numeric|min:0',
+            'update_master_price' => 'nullable|boolean',
             'reason' => 'required|in:Damage,Expiry,Breakage,Audit Recount,Other',
             'notes' => 'nullable|string',
         ]);
@@ -224,18 +233,21 @@ class MasterDataController extends Controller
                 (int) $validated['new_quantity'],
                 $validated['reason'],
                 Auth::id() ?? 1,
-                $validated['notes'] ?? null
+                $validated['notes'] ?? null,
+                isset($validated['selling_price']) ? (float) $validated['selling_price'] : null,
+                isset($validated['purchase_cost']) ? (float) $validated['purchase_cost'] : null,
+                $request->boolean('update_master_price')
             );
 
             if ($request->expectsJson()) {
                 return response()->json([
                     'success' => true,
-                    'message' => "Stock adjusted from {$adjustment->previous_quantity} to {$adjustment->new_quantity} ({$adjustment->reason}).",
+                    'message' => "Batch updated successfully (Stock: {$adjustment->new_quantity}, Reason: {$adjustment->reason}).",
                     'adjustment' => $adjustment,
                 ]);
             }
 
-            return back()->with('success', "Stock updated to {$adjustment->new_quantity} with reason '{$adjustment->reason}'.");
+            return back()->with('success', "Batch #{$adjustment->batch->batch_number} stock & price updated successfully.");
         } catch (Exception $e) {
             if ($request->expectsJson()) {
                 return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
