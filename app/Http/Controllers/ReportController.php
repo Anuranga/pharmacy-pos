@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Category;
 use App\Models\Customer;
 use App\Models\CustomerExtraPayment;
 use App\Models\CustomerSettlement;
 use App\Models\Grn;
+use App\Models\GrnItem;
 use App\Models\Prescription;
 use App\Models\Product;
 use App\Models\ProductBatch;
+use App\Models\PurchaseReturnItem;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SaleReturnItem;
 use App\Models\StockAdjustment;
 use App\Models\Supplier;
 use App\Models\SupplierPayment;
@@ -401,6 +405,241 @@ class ReportController extends Controller
             'totalRegisterCash',
             'totalSystemGross',
             'cashiers'
+        ));
+    }
+
+    /**
+     * 12. Item Stock Movement & Date-Range Comparison Report
+     * Displays initial stock on start_date, movements (GRN in, Sales out, Returns, Adjustments),
+     * closing stock on end_date, and stock difference, with Category/Item filtering and PDF/Excel export.
+     */
+    public function itemStockMovement(Request $request)
+    {
+        $startDate = $request->get('start_date', now()->startOfMonth()->toDateString());
+        $endDate = $request->get('end_date', now()->toDateString());
+        if ($startDate > $endDate) {
+            [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        $categoryId = $request->get('category_id');
+        $search = trim($request->get('q', ''));
+        $selectedProductIds = array_filter((array) $request->get('product_ids', []), fn($v) => is_numeric($v));
+
+        $categories = Category::orderBy('name')->get();
+        $allCatalogProducts = Product::with('category')->orderBy('brand_name')->get();
+
+        $productQuery = Product::with(['category', 'batches']);
+
+        if (!empty($selectedProductIds)) {
+            $productQuery->whereIn('id', $selectedProductIds);
+        } else {
+            if (!empty($categoryId)) {
+                $productQuery->where('category_id', $categoryId);
+            }
+            if (!empty($search)) {
+                $productQuery->search($search);
+            }
+        }
+
+        $products = $productQuery->orderBy('brand_name')->get();
+        $pIds = $products->pluck('id');
+
+        $startDateTime = Carbon::parse($startDate)->startOfDay();
+        $endDateTime = Carbon::parse($endDate)->endOfDay();
+
+        // 1. Movements WITHIN [startDate, endDate]
+        $grnInPeriod = GrnItem::whereIn('product_id', $pIds)
+            ->whereBetween('created_at', [$startDateTime, $endDateTime])
+            ->select('product_id', DB::raw('SUM(quantity_received + free_bonus_qty) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $soldInPeriod = SaleItem::whereIn('product_id', $pIds)
+            ->whereHas('sale', fn($q) => $q->where('status', 'completed')->whereBetween('created_at', [$startDateTime, $endDateTime]))
+            ->select('product_id', DB::raw('SUM(quantity) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $custRetInPeriod = SaleReturnItem::whereIn('product_id', $pIds)
+            ->where('restock_status', 'restocked')
+            ->whereBetween('created_at', [$startDateTime, $endDateTime])
+            ->select('product_id', DB::raw('SUM(quantity_returned) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $suppRetInPeriod = PurchaseReturnItem::whereIn('product_id', $pIds)
+            ->whereBetween('created_at', [$startDateTime, $endDateTime])
+            ->select('product_id', DB::raw('SUM(quantity_returned) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $adjInPeriod = StockAdjustment::whereIn('product_id', $pIds)
+            ->whereBetween('created_at', [$startDateTime, $endDateTime])
+            ->select('product_id', DB::raw('SUM(new_quantity - previous_quantity) as delta'))
+            ->groupBy('product_id')
+            ->pluck('delta', 'product_id');
+
+        // 2. Movements AFTER endDate (to reconstruct exact stock on endDate)
+        $grnAfter = GrnItem::whereIn('product_id', $pIds)
+            ->where('created_at', '>', $endDateTime)
+            ->select('product_id', DB::raw('SUM(quantity_received + free_bonus_qty) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $soldAfter = SaleItem::whereIn('product_id', $pIds)
+            ->whereHas('sale', fn($q) => $q->where('status', 'completed')->where('created_at', '>', $endDateTime))
+            ->select('product_id', DB::raw('SUM(quantity) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $custRetAfter = SaleReturnItem::whereIn('product_id', $pIds)
+            ->where('restock_status', 'restocked')
+            ->where('created_at', '>', $endDateTime)
+            ->select('product_id', DB::raw('SUM(quantity_returned) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $suppRetAfter = PurchaseReturnItem::whereIn('product_id', $pIds)
+            ->where('created_at', '>', $endDateTime)
+            ->select('product_id', DB::raw('SUM(quantity_returned) as qty'))
+            ->groupBy('product_id')
+            ->pluck('qty', 'product_id');
+
+        $adjAfter = StockAdjustment::whereIn('product_id', $pIds)
+            ->where('created_at', '>', $endDateTime)
+            ->select('product_id', DB::raw('SUM(new_quantity - previous_quantity) as delta'))
+            ->groupBy('product_id')
+            ->pluck('delta', 'product_id');
+
+        $reportRows = $products->map(function (Product $p) use (
+            $grnInPeriod, $soldInPeriod, $custRetInPeriod, $suppRetInPeriod, $adjInPeriod,
+            $grnAfter, $soldAfter, $custRetAfter, $suppRetAfter, $adjAfter
+        ) {
+            $currentLiveStock = (int) $p->batches->sum('stock_quantity');
+
+            $afterNetDelta = (int) ($grnAfter[$p->id] ?? 0)
+                - (int) ($soldAfter[$p->id] ?? 0)
+                + (int) ($custRetAfter[$p->id] ?? 0)
+                - (int) ($suppRetAfter[$p->id] ?? 0)
+                + (int) ($adjAfter[$p->id] ?? 0);
+
+            // Stock at end of endDate
+            $endStock = $currentLiveStock - $afterNetDelta;
+
+            // Movements during [startDate, endDate]
+            $grnAdded = (int) ($grnInPeriod[$p->id] ?? 0);
+            $soldOut = (int) ($soldInPeriod[$p->id] ?? 0);
+            $custReturned = (int) ($custRetInPeriod[$p->id] ?? 0);
+            $suppReturned = (int) ($suppRetInPeriod[$p->id] ?? 0);
+            $adjDelta = (int) ($adjInPeriod[$p->id] ?? 0);
+
+            $netDifference = $grnAdded - $soldOut + $custReturned - $suppReturned + $adjDelta;
+
+            // Initial / Opening Stock at start of startDate
+            $startStock = $endStock - $netDifference;
+
+            $unitCost = (float) $p->unit_cost_price;
+            $unitRetail = (float) $p->unit_retail_price;
+            $unitsPerPack = max(1, (int) ($p->units_per_pack ?? 1));
+
+            return [
+                'id' => $p->id,
+                'barcode_sku' => $p->barcode_sku,
+                'brand_name' => $p->brand_name,
+                'generic_name' => $p->generic_name ?? '—',
+                'category_name' => $p->category?->name ?? 'General',
+                'base_uom' => $p->base_uom ?? 'Unit',
+                'units_per_pack' => $unitsPerPack,
+                'unit_cost' => $unitCost,
+                'unit_retail' => $unitRetail,
+                'start_stock' => $startStock,
+                'grn_in' => $grnAdded,
+                'sold_out' => $soldOut,
+                'returns_adj_net' => ($custReturned - $suppReturned + $adjDelta),
+                'end_stock' => $endStock,
+                'current_live_stock' => $currentLiveStock,
+                'stock_difference' => $netDifference,
+                'start_value_cost' => round($startStock * $unitCost, 2),
+                'end_value_cost' => round($endStock * $unitCost, 2),
+                'diff_value_cost' => round($netDifference * $unitCost, 2),
+            ];
+        });
+
+        // Server-side CSV/Excel stream download if requested
+        if ($request->get('export') === 'csv') {
+            $filename = "Item_Stock_Movement_{$startDate}_to_{$endDate}.csv";
+            $headers = [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ];
+
+            $callback = function () use ($reportRows, $startDate, $endDate) {
+                $out = fopen('php://output', 'w');
+                // UTF-8 BOM for Excel compatibility
+                fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+                fputcsv($out, [
+                    'SKU / Barcode',
+                    'Item / Medication Name',
+                    'Category',
+                    'UOM',
+                    'Pack Size',
+                    "Initial Stock ({$startDate})",
+                    'GRN Received (+)',
+                    'POS Sold (-)',
+                    'Returns & Adjustments (+/-)',
+                    "Closing Stock ({$endDate})",
+                    'Stock Difference',
+                    'Unit Cost (Rs.)',
+                    'Retail Price (Rs.)',
+                    "Closing Stock Value (Rs.)",
+                ]);
+
+                foreach ($reportRows as $r) {
+                    fputcsv($out, [
+                        $r['barcode_sku'],
+                        $r['brand_name'],
+                        $r['category_name'],
+                        $r['base_uom'],
+                        $r['units_per_pack'],
+                        $r['start_stock'],
+                        $r['grn_in'],
+                        $r['sold_out'],
+                        $r['returns_adj_net'],
+                        $r['end_stock'],
+                        ($r['stock_difference'] > 0 ? '+' : '') . $r['stock_difference'],
+                        number_format($r['unit_cost'], 2, '.', ''),
+                        number_format($r['unit_retail'], 2, '.', ''),
+                        number_format($r['end_value_cost'], 2, '.', ''),
+                    ]);
+                }
+                fclose($out);
+            };
+
+            return response()->stream($callback, 200, $headers);
+        }
+
+        $summary = [
+            'items_count' => $reportRows->count(),
+            'total_start_stock' => (int) $reportRows->sum('start_stock'),
+            'total_grn_in' => (int) $reportRows->sum('grn_in'),
+            'total_sold_out' => (int) $reportRows->sum('sold_out'),
+            'total_returns_adj' => (int) $reportRows->sum('returns_adj_net'),
+            'total_end_stock' => (int) $reportRows->sum('end_stock'),
+            'total_difference' => (int) $reportRows->sum('stock_difference'),
+            'total_start_value' => (float) $reportRows->sum('start_value_cost'),
+            'total_end_value' => (float) $reportRows->sum('end_value_cost'),
+        ];
+
+        return view('reports.item_stock_movement', compact(
+            'reportRows',
+            'summary',
+            'categories',
+            'allCatalogProducts',
+            'startDate',
+            'endDate',
+            'categoryId',
+            'search',
+            'selectedProductIds'
         ));
     }
 }

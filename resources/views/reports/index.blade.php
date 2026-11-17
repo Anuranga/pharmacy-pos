@@ -130,7 +130,24 @@
     <!-- Section 3: Financial Margins & Inventory Valuation -->
     <div class="space-y-3">
         <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">3. Financial Ledger & Inventory Assets</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+
+            <a href="{{ route('reports.item-stock-movement') }}" class="group bg-white p-5 rounded-3xl border-2 border-emerald-500/80 hover:border-emerald-600 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-arrows-left-right-to-line"></i>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold uppercase">PDF / Excel</span>
+                    </div>
+                    <h3 class="font-bold text-slate-900 group-hover:text-emerald-700 text-sm">12. Item Stock Movement & Comparison</h3>
+                    <p class="text-xs text-slate-500 mt-1">Compare Initial Stock vs Closing Stock across any date range with stock difference, category/item filter, and PDF & Excel export.</p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-emerald-600">
+                    <span>Open & Export</span>
+                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </div>
+            </a>
             
             <a href="{{ route('reports.profit-loss') }}" class="group bg-white p-5 rounded-3xl border border-slate-200/90 hover:border-emerald-500 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
                 <div>

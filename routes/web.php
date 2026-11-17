@@ -119,6 +119,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/inventory-valuation', [ReportController::class, 'inventoryValuation'])->name('inventory-valuation');
             Route::get('/expiry-alerts', [ReportController::class, 'expiryAlerts'])->name('expiry-alerts');
             Route::get('/profit-loss', [ReportController::class, 'profitLoss'])->name('profit-loss');
+            Route::get('/item-stock-movement', [ReportController::class, 'itemStockMovement'])->name('item-stock-movement');
         });
     });
 });

@@ -241,6 +241,9 @@
                             @if(auth()->user()->isAdmin())
                             <div class="py-1">
                                 <div class="px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Inventory & Financials</div>
+                                <a href="{{ route('reports.item-stock-movement') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-semibold">
+                                    <i class="fa-solid fa-arrows-left-right-to-line w-5 text-emerald-400"></i> 12. Item Stock Movement (PDF/Excel)
+                                </a>
                                 <a href="{{ route('reports.expiry-alerts') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
                                     <i class="fa-solid fa-triangle-exclamation w-5 text-amber-500"></i> 9. FEFO Expiry Alerts
                                 </a>
