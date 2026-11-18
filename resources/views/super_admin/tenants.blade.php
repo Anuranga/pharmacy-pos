@@ -21,7 +21,6 @@
                 <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest bg-amber-500/20 text-amber-300 border border-amber-500/40">
                     <i class="fa-solid fa-crown mr-1"></i> Platform Super Administrator
                 </span>
-                <span class="text-xs font-mono text-slate-400">Login: superadmin / superadmin123</span>
             </div>
             <h1 class="text-2xl font-extrabold font-display tracking-tight mt-1.5">
                 Multi-Tenant Pharmacy Control Center
@@ -139,8 +138,9 @@
                         </td>
                         <td class="py-3.5 px-4 text-right">
                             <div class="inline-flex items-center gap-1.5">
-                                <!-- Enable / Disable Toggle -->
-                                <form method="POST" action="{{ route('super-admin.tenants.toggle', $t->id) }}" class="inline">
+                                <!-- Enable / Disable Toggle with SweetAlert2 Confirmation -->
+                                <form method="POST" action="{{ route('super-admin.tenants.toggle', $t->id) }}" class="inline"
+                                      @submit.prevent="confirmToggleTenant($event, '{{ addslashes($t->name) }}', {{ $t->is_active ? 'true' : 'false' }})">
                                     @csrf
                                     <button type="submit"
                                             class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer {{ $t->is_active ? 'bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs' }}">
@@ -280,4 +280,45 @@
     </div>
 
 </div>
+
+@push('scripts')
+<script>
+function confirmToggleTenant(event, tenantName, isCurrentlyActive) {
+    const form = event.target;
+    if (isCurrentlyActive) {
+        Swal.fire({
+            title: 'Disable Pharmacy Tenant?',
+            html: `Are you sure you want to disable <strong>${tenantName}</strong>?<br><span class="text-xs text-slate-500 mt-1 block">Its Admin, Managers, Cashiers, and Staff will be immediately blocked from logging in until re-enabled.</span>`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: '<i class="fa-solid fa-ban mr-1"></i> Yes, Disable Tenant',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
+    } else {
+        Swal.fire({
+            title: 'Enable Pharmacy Tenant?',
+            html: `Restore full login and billing access for <strong>${tenantName}</strong>?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#059669',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: '<i class="fa-solid fa-circle-check mr-1"></i> Yes, Enable Tenant',
+            cancelButtonText: 'Cancel',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
+            }
+        });
+    }
+}
+</script>
+@endpush
 @endsection

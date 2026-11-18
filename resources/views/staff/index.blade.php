@@ -116,7 +116,9 @@
     </div>
 
     <!-- SECTION 2: Logical Role-Wise Permission Checkboxes Matrix -->
-    <form method="POST" action="{{ route('staff.permissions.update') }}" class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <form method="POST" action="{{ route('staff.permissions.update') }}"
+          @submit.prevent="confirmSavePermissions($event)"
+          class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         @csrf
 
         <div class="px-6 py-4 border-b border-slate-200 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -182,6 +184,7 @@
                             <input type="checkbox"
                                    name="permissions[manager][]"
                                    value="{{ $permKey }}"
+                                   @change="onPermissionToggle($event, '{{ addslashes($permLabel) }}', 'Pharmacy Manager')"
                                    {{ in_array($permKey, $rolePermissions['manager'] ?? [], true) ? 'checked' : '' }}
                                    class="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer">
                         </td>
@@ -191,6 +194,7 @@
                             <input type="checkbox"
                                    name="permissions[cashier][]"
                                    value="{{ $permKey }}"
+                                   @change="onPermissionToggle($event, '{{ addslashes($permLabel) }}', 'POS Cashier')"
                                    {{ in_array($permKey, $rolePermissions['cashier'] ?? [], true) ? 'checked' : '' }}
                                    class="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer">
                         </td>
@@ -200,6 +204,7 @@
                             <input type="checkbox"
                                    name="permissions[staff][]"
                                    value="{{ $permKey }}"
+                                   @change="onPermissionToggle($event, '{{ addslashes($permLabel) }}', 'Pharmacy Staff')"
                                    {{ in_array($permKey, $rolePermissions['staff'] ?? [], true) ? 'checked' : '' }}
                                    class="w-4 h-4 rounded text-sky-600 border-slate-300 focus:ring-sky-500 cursor-pointer">
                         </td>
@@ -372,4 +377,49 @@
     </div>
 
 </div>
+
+@push('scripts')
+<script>
+function onPermissionToggle(event, permLabel, roleLabel) {
+    const checkbox = event.target;
+    // When unticking (removing) a permission, ask for confirmation
+    if (!checkbox.checked) {
+        Swal.fire({
+            title: 'Remove Permission?',
+            html: `Are you sure you want to remove <strong>"${permLabel}"</strong> from <strong>${roleLabel}</strong>?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Yes, Remove Permission',
+            cancelButtonText: 'Keep Permission',
+            reverseButtons: true
+        }).then((result) => {
+            if (!result.isConfirmed) {
+                checkbox.checked = true;
+            }
+        });
+    }
+}
+
+function confirmSavePermissions(event) {
+    const form = event.target;
+    Swal.fire({
+        title: 'Save Role-Wise Permissions?',
+        html: 'This will immediately update module access and permissions for all <strong>Managers</strong>, <strong>Cashiers</strong>, and <strong>Staff</strong> in your pharmacy.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: '<i class="fa-solid fa-floppy-disk mr-1"></i> Yes, Save Permissions',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            form.submit();
+        }
+    });
+}
+</script>
+@endpush
 @endsection

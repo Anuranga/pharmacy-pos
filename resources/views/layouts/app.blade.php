@@ -322,7 +322,7 @@
                                 <div class="px-2 py-1 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Switch Shop User</div>
                                 @php
                                     $switchUsers = auth()->user()->isSuperAdmin()
-                                        ? \App\Models\User::with('role')->limit(15)->get()
+                                        ? \App\Models\User::with('role')->whereNotNull('tenant_id')->limit(15)->get()
                                         : \App\Models\User::with('role')->where('tenant_id', auth()->user()->tenant_id)->get();
                                 @endphp
                                 @foreach($switchUsers as $u)

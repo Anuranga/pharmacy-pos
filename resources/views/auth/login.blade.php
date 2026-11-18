@@ -44,13 +44,13 @@
                 @csrf
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email or Username</label>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                            <i class="fa-solid fa-user text-sm"></i>
+                            <i class="fa-solid fa-envelope text-sm"></i>
                         </div>
                         <input type="text" name="email" id="email" required value="{{ old('email', 'admin@pharmacy.com') }}"
-                               placeholder="admin@pharmacy.com or superadmin"
+                               placeholder="Enter your email..."
                                class="w-full pl-10 pr-3 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-medium">
                     </div>
                 </div>
@@ -80,15 +80,8 @@
 
             <!-- Quick Role Login Switcher -->
             <div class="mt-6 pt-5 border-t border-slate-700/80 space-y-2.5">
-                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">1-Click Fast Login</p>
-                <div class="grid grid-cols-3 gap-2 text-xs">
-                    <button type="button" 
-                            onclick="document.getElementById('email').value='superadmin'; document.getElementById('password').value='superadmin123'; document.forms[0].submit();"
-                            class="p-2.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 border border-amber-700/80 text-amber-200 font-semibold text-center transition-colors">
-                        <i class="fa-solid fa-crown text-amber-400 mb-1 block"></i>
-                        Super Admin
-                    </button>
-
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider text-center">1-Click Fast Login (Demo Accounts)</p>
+                <div class="grid grid-cols-2 gap-2 text-xs">
                     <button type="button" 
                             onclick="document.getElementById('email').value='admin@pharmacy.com'; document.getElementById('password').value='password'; document.forms[0].submit();"
                             class="p-2.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 border border-purple-800 text-purple-200 font-semibold text-center transition-colors">
