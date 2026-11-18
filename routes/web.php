@@ -8,6 +8,8 @@ use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\POSController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReturnController;
+use App\Http\Controllers\StaffController;
+use App\Http\Controllers\SuperAdminController;
 use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,15 +19,36 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Authentication
+// Authentication & Pharmacy Tenant Registration
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
+Route::get('/register-pharmacy', [AuthController::class, 'showRegisterPharmacy'])->name('register.pharmacy');
+Route::post('/register-pharmacy', [AuthController::class, 'registerPharmacy'])->name('register.pharmacy.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/auth/switch/{user}', [AuthController::class, 'switchUser'])->name('auth.switch');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', function () {
-        return redirect()->route('dashboard');
+        return auth()->user()->isSuperAdmin()
+            ? redirect()->route('super-admin.tenants.index')
+            : redirect()->route('dashboard');
+    });
+
+    // Super Admin Multi-Tenant Control Center
+    Route::prefix('super-admin')->name('super-admin.')->middleware(['role:super_admin'])->group(function () {
+        Route::get('/tenants', [SuperAdminController::class, 'index'])->name('tenants.index');
+        Route::post('/tenants', [SuperAdminController::class, 'storeTenant'])->name('tenants.store');
+        Route::post('/tenants/{tenant}/toggle', [SuperAdminController::class, 'toggleTenantStatus'])->name('tenants.toggle');
+        Route::put('/tenants/{tenant}', [SuperAdminController::class, 'updateTenant'])->name('tenants.update');
+    });
+
+    // Pharmacy Admin: Staff (Managers, Cashiers, Staff) & Role-Wise Permissions
+    Route::prefix('staff')->name('staff.')->middleware(['role:admin'])->group(function () {
+        Route::get('/', [StaffController::class, 'index'])->name('index');
+        Route::post('/', [StaffController::class, 'storeStaff'])->name('store');
+        Route::put('/{user}', [StaffController::class, 'updateStaff'])->name('update');
+        Route::post('/{user}/password', [StaffController::class, 'changePassword'])->name('password');
+        Route::post('/permissions', [StaffController::class, 'updateRolePermissions'])->name('permissions.update');
     });
 
     // Executive & Clinical Operations Dashboard

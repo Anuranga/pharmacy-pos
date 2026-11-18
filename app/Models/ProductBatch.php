@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ProductBatch extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
+        'tenant_id',
         'product_id',
         'supplier_id',
         'batch_number',

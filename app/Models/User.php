@@ -12,6 +12,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     protected $fillable = [
+        'tenant_id',
         'name',
         'email',
         'phone',
@@ -29,6 +30,11 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
     ];
 
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function role()
     {
         return $this->belongsTo(Role::class);
@@ -39,9 +45,23 @@ class User extends Authenticatable
         return $this->hasMany(Sale::class, 'cashier_id');
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->role && strtolower($this->role->name) === 'super_admin';
+    }
+
     public function isAdmin(): bool
     {
-        return $this->role && strtolower($this->role->name) === 'admin';
+        if (!$this->role) {
+            return false;
+        }
+        $roleName = strtolower($this->role->name);
+        return in_array($roleName, ['admin', 'super_admin']);
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role && strtolower($this->role->name) === 'manager';
     }
 
     public function isCashier(): bool
@@ -52,5 +72,30 @@ class User extends Authenticatable
     public function hasRole(string $roleName): bool
     {
         return $this->role && strtolower($this->role->name) === strtolower($roleName);
+    }
+
+    /**
+     * Check whether the user has a given shop permission based on their role and tenant configuration.
+     */
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->isSuperAdmin() || $this->isAdmin()) {
+            return true;
+        }
+
+        if (!$this->tenant_id || !$this->role) {
+            return false;
+        }
+
+        $roleName = strtolower($this->role->name);
+        $rolePerm = TenantRolePermission::where('tenant_id', $this->tenant_id)
+            ->where('role_name', $roleName)
+            ->first();
+
+        $allowed = $rolePerm
+            ? (array) ($rolePerm->permissions ?? [])
+            : TenantRolePermission::defaultPermissionsForRole($roleName);
+
+        return in_array($permission, $allowed, true);
     }
 }

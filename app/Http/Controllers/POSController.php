@@ -212,10 +212,16 @@ class POSController extends Controller
      */
     public function quickStoreProduct(Request $request)
     {
+        $tenantId = Auth::user()?->tenant_id;
         $validated = $request->validate([
             'brand_name' => 'required|string|max:150',
             'generic_name' => 'nullable|string|max:150',
-            'barcode_sku' => 'required|string|max:100|unique:products,barcode_sku',
+            'barcode_sku' => [
+                'required',
+                'string',
+                'max:100',
+                \Illuminate\Validation\Rule::unique('products', 'barcode_sku')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'dosage_strength' => 'nullable|string|max:50',
             'item_type' => 'required|string',
             'category_id' => 'nullable|exists:categories,id',

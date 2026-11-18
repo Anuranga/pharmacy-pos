@@ -66,8 +66,14 @@ class MasterDataController extends Controller
      */
     public function storeProduct(Request $request)
     {
+        $tenantId = Auth::user()?->tenant_id;
         $validated = $request->validate([
-            'barcode_sku' => 'required|string|max:100|unique:products,barcode_sku',
+            'barcode_sku' => [
+                'required',
+                'string',
+                'max:100',
+                \Illuminate\Validation\Rule::unique('products', 'barcode_sku')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'brand_name' => 'required|string|max:150',
             'generic_name' => 'nullable|string|max:150',
             'dosage_strength' => 'nullable|string|max:50',
@@ -123,8 +129,14 @@ class MasterDataController extends Controller
      */
     public function updateProduct(Request $request, Product $product)
     {
+        $tenantId = Auth::user()?->tenant_id;
         $validated = $request->validate([
-            'barcode_sku' => 'required|string|max:100|unique:products,barcode_sku,' . $product->id,
+            'barcode_sku' => [
+                'required',
+                'string',
+                'max:100',
+                \Illuminate\Validation\Rule::unique('products', 'barcode_sku')->ignore($product->id)->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'brand_name' => 'required|string|max:150',
             'generic_name' => 'nullable|string|max:150',
             'dosage_strength' => 'nullable|string|max:50',
@@ -188,8 +200,14 @@ class MasterDataController extends Controller
 
     public function storeCategory(Request $request)
     {
+        $tenantId = Auth::user()?->tenant_id;
         $validated = $request->validate([
-            'name' => 'required|string|max:100|unique:categories,name',
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                \Illuminate\Validation\Rule::unique('categories', 'name')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'code' => 'nullable|string|max:20',
             'description' => 'nullable|string',
         ]);
@@ -201,8 +219,14 @@ class MasterDataController extends Controller
 
     public function updateCategory(Request $request, Category $category)
     {
+        $tenantId = Auth::user()?->tenant_id;
         $validated = $request->validate([
-            'name' => 'required|string|max:100|unique:categories,name,' . $category->id,
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                \Illuminate\Validation\Rule::unique('categories', 'name')->ignore($category->id)->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'code' => 'nullable|string|max:20',
             'description' => 'nullable|string',
         ]);

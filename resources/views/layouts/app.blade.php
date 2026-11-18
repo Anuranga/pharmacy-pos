@@ -74,38 +74,53 @@
                 
                 <!-- Logo & Brand -->
                 <div class="flex items-center shrink-0">
-                    <a href="{{ route('dashboard') }}" class="flex items-center space-x-2 group">
+                    <a href="{{ auth()->user()->isSuperAdmin() ? route('super-admin.tenants.index') : route('dashboard') }}" class="flex items-center space-x-2 group">
                         <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
                             <i class="fa-solid fa-mortar-pestle text-base"></i>
                         </div>
                         <div>
                             <span class="font-display font-bold text-base tracking-tight text-white flex items-center gap-1.5 leading-none">
-                                PharmaCare <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono font-medium border border-emerald-500/30">POS Pro</span>
+                                {{ auth()->user()->tenant->name ?? 'PharmaCare' }} <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-mono font-medium border border-emerald-500/30">{{ auth()->user()->isSuperAdmin() ? 'SUPER ADMIN' : 'POS Pro' }}</span>
                             </span>
-                            <span class="text-[9px] text-slate-400 hidden xl:block tracking-wider uppercase font-medium mt-0.5">Pharmacy & Financial Ledger</span>
+                            <span class="text-[9px] text-slate-400 hidden xl:block tracking-wider uppercase font-medium mt-0.5">
+                                {{ auth()->user()->tenant ? ('Tenant: ' . auth()->user()->tenant->code) : 'Multi-Tenant Platform Control' }}
+                            </span>
                         </div>
                     </a>
                 </div>
 
                 <!-- Main Nav Links -->
                 <nav class="hidden md:flex items-center space-x-1">
+                    @if(auth()->user()->isSuperAdmin())
+                    <a href="{{ route('super-admin.tenants.index') }}"
+                       class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('super-admin.*') ? 'bg-amber-600 text-white shadow-sm' : 'text-amber-300 hover:text-white hover:bg-slate-800' }}">
+                        <i class="fa-solid fa-crown"></i>
+                        <span>Tenants Control</span>
+                    </a>
+                    @endif
+
+                    @if(!auth()->user()->isSuperAdmin())
                     <!-- Executive Dashboard -->
+                    @if(auth()->user()->hasPermission('view_dashboard'))
                     <a href="{{ route('dashboard') }}" 
                        class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('dashboard') ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                         <i class="fa-solid fa-gauge-high {{ request()->routeIs('dashboard') ? 'text-white' : 'text-emerald-400' }}"></i>
                         <span>Dashboard</span>
                     </a>
+                    @endif
 
                     <!-- POS Terminal -->
+                    @if(auth()->user()->hasPermission('pos_access'))
                     <a href="{{ route('pos.index') }}" 
                        class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('pos.*') ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                         <i class="fa-solid fa-cash-register {{ request()->routeIs('pos.*') ? 'text-white' : 'text-emerald-400' }}"></i>
                         <span>POS Counter</span>
                         <span class="hidden 2xl:inline text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">F2/F8</span>
                     </a>
+                    @endif
 
-                    <!-- Master Data (Admin Only) -->
-                    @if(auth()->user()->isAdmin())
+                    <!-- Master Data -->
+                    @if(auth()->user()->hasPermission('manage_master_data'))
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
                                 class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('master.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
@@ -130,8 +145,10 @@
                             </a>
                         </div>
                     </div>
+                    @endif
 
-                    <!-- GRN Procurement (Admin Only) -->
+                    <!-- GRN Procurement -->
+                    @if(auth()->user()->hasPermission('manage_grn'))
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
                                 class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('grn.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
@@ -154,15 +171,17 @@
                     </div>
                     @endif
 
-                    <!-- Customers & Lending (Cashier & Admin) -->
+                    <!-- Customers & Lending -->
+                    @if(auth()->user()->hasPermission('manage_customers'))
                     <a href="{{ route('customers.index') }}" 
                        class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('customers.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                         <i class="fa-solid fa-users"></i>
                         <span>Customers</span>
                     </a>
+                    @endif
 
-                    <!-- Suppliers & AP (Admin Only) -->
-                    @if(auth()->user()->isAdmin())
+                    <!-- Suppliers & AP -->
+                    @if(auth()->user()->hasPermission('manage_suppliers'))
                     <a href="{{ route('suppliers.index') }}" 
                        class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('suppliers.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
                         <i class="fa-solid fa-building-wheat"></i>
@@ -170,7 +189,8 @@
                     </a>
                     @endif
 
-                    <!-- Returns Hub (Customer Bill Returns & Shop GRN Returns) -->
+                    <!-- Returns Hub -->
+                    @if(auth()->user()->hasPermission('manage_customer_returns') || auth()->user()->hasPermission('manage_supplier_returns'))
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
                                 class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('returns.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
@@ -180,10 +200,12 @@
                         </button>
                         <div x-show="open" x-cloak
                              class="absolute left-0 mt-2 w-64 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl py-2 z-50 text-sm">
+                            @if(auth()->user()->hasPermission('manage_customer_returns'))
                             <a href="{{ route('returns.customer.create') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-medium">
                                 <i class="fa-solid fa-receipt mr-2 text-emerald-400"></i> Customer Bill Return
                             </a>
-                            @if(auth()->user()->isAdmin())
+                            @endif
+                            @if(auth()->user()->hasPermission('manage_supplier_returns'))
                             <a href="{{ route('returns.supplier.create') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-medium">
                                 <i class="fa-solid fa-truck-ramp-box mr-2 text-indigo-400"></i> Shop GRN Return (Supplier)
                             </a>
@@ -194,8 +216,9 @@
                             </a>
                         </div>
                     </div>
+                    @endif
 
-                    <!-- Reports Hub (Exact 11 Reports) -->
+                    <!-- Reports Hub -->
                     <div class="relative" x-data="{ open: false }" @click.outside="open = false">
                         <button @click="open = !open" 
                                 class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('reports.*') ? 'bg-slate-800 text-emerald-400' : 'text-slate-300 hover:text-white hover:bg-slate-800' }}">
@@ -209,18 +232,23 @@
                             <!-- Clinical & POS Reports -->
                             <div class="py-1">
                                 <div class="px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Sales & Cashier</div>
+                                @if(auth()->user()->hasPermission('view_eod_report'))
                                 <a href="{{ route('reports.eod-z-report') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
                                     <i class="fa-solid fa-calculator w-5 text-emerald-400"></i> 11. EOD Z-Report (Register Close)
                                 </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('view_management_reports'))
                                 <a href="{{ route('reports.sales-by-customer') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
                                     <i class="fa-solid fa-trophy w-5 text-amber-400"></i> 5. Sales by Customer
                                 </a>
                                 <a href="{{ route('reports.patient-rx-history') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
                                     <i class="fa-solid fa-file-prescription w-5 text-cyan-400"></i> 7. Patient Rx & Controlled History
                                 </a>
+                                @endif
                             </div>
 
                             <!-- Customers & Lending -->
+                            @if(auth()->user()->hasPermission('view_management_reports'))
                             <div class="py-1">
                                 <div class="px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Receivables & Lending</div>
                                 <a href="{{ route('reports.customer-vs-transaction') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
@@ -238,7 +266,6 @@
                             </div>
 
                             <!-- Inventory & Suppliers -->
-                            @if(auth()->user()->isAdmin())
                             <div class="py-1">
                                 <div class="px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Inventory & Financials</div>
                                 <a href="{{ route('reports.item-stock-movement') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-semibold">
@@ -260,6 +287,16 @@
                             @endif
                         </div>
                     </div>
+
+                    <!-- Pharmacy Admin: Staff & Role Permissions -->
+                    @if(auth()->user()->isAdmin())
+                    <a href="{{ route('staff.index') }}"
+                       class="px-2.5 py-1.5 rounded-lg text-xs xl:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 {{ request()->routeIs('staff.*') ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-300 hover:text-white hover:bg-slate-800' }}">
+                        <i class="fa-solid fa-user-gear"></i>
+                        <span>Staff & Permissions</span>
+                    </a>
+                    @endif
+                    @endif
                 </nav>
 
                 <!-- User, Role Switcher & Prominent Logout -->
@@ -274,20 +311,25 @@
                             <div class="text-[9px] text-emerald-400 uppercase tracking-wider font-mono font-medium">{{ auth()->user()->role->label }}</div>
                         </div>
 
-                        <!-- 1-Click Role Switcher Dropdown (Local XAMPP Testing) -->
+                        <!-- 1-Click Role Switcher Dropdown (Scoped to Active Tenant) -->
                         <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                            <button @click="open = !open" title="Switch Role / Cashier"
+                            <button @click="open = !open" title="Switch Role / Staff Account"
                                     class="text-slate-400 hover:text-white p-1 rounded transition-colors text-xs">
                                 <i class="fa-solid fa-repeat"></i>
                             </button>
                             <div x-show="open" x-cloak
                                  class="absolute right-0 mt-2 w-64 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-50 text-xs">
-                                <div class="px-2 py-1 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Switch Active Session</div>
-                                @foreach(\App\Models\User::with('role')->get() as $u)
+                                <div class="px-2 py-1 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">Switch Shop User</div>
+                                @php
+                                    $switchUsers = auth()->user()->isSuperAdmin()
+                                        ? \App\Models\User::with('role')->limit(15)->get()
+                                        : \App\Models\User::with('role')->where('tenant_id', auth()->user()->tenant_id)->get();
+                                @endphp
+                                @foreach($switchUsers as $u)
                                 <a href="{{ route('auth.switch', $u->id) }}" 
                                    class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800 text-slate-200 transition-colors {{ auth()->id() == $u->id ? 'bg-slate-800/80 text-emerald-400 font-semibold' : '' }}">
                                     <span>{{ $u->name }}</span>
-                                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded {{ $u->isAdmin() ? 'bg-purple-900/50 text-purple-300' : 'bg-emerald-900/50 text-emerald-300' }}">{{ $u->role->name }}</span>
+                                    <span class="text-[10px] font-mono px-1.5 py-0.5 rounded {{ $u->isAdmin() ? 'bg-purple-900/50 text-purple-300' : 'bg-emerald-900/50 text-emerald-300' }}">{{ $u->role->name ?? 'staff' }}</span>
                                 </a>
                                 @endforeach
                             </div>
