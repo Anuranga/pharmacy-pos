@@ -24,7 +24,7 @@
                 <i class="fa-solid fa-user-gear text-emerald-600"></i>
                 <span>Shop Staff & Role-Wise Permission Matrix</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-0.5">
+            <p class="ui-subheading text-xs text-slate-500 mt-0.5">
                 Add Managers, Cashiers, and Staff for your pharmacy, change their passwords, and configure role-wise access permissions via checkboxes.
             </p>
         </div>
@@ -223,6 +223,54 @@
                     class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer">
                 <i class="fa-solid fa-floppy-disk mr-1.5"></i> Save Role-Wise Permissions
             </button>
+        </div>
+    </form>
+
+    <!-- SECTION 3: Admin UI & Dashboard Content Visibility Controls (Enable / Disable Sub-Headings & Dashboard Widgets) -->
+    @php
+        $uiSettingDefinitions = $uiSettingDefinitions ?? \App\Models\TenantRolePermission::uiSettingDefinitions();
+        $uiSettings = $uiSettings ?? \App\Models\TenantRolePermission::getUiSettingsForTenant(auth()->user()->tenant_id ?? null);
+    @endphp
+    <form method="POST" action="{{ route('staff.ui-settings.update') }}"
+          class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        @csrf
+        <div class="px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-slate-900 to-purple-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <h2 class="font-display font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-purple-300"></i>
+                    <span>3. Interface & Dashboard Content Controls (Enable / Disable)</span>
+                </h2>
+                <p class="ui-subheading text-xs text-slate-300 mt-0.5">
+                    Sub-heading descriptions are disabled by default for a clean interface. Tick or untick below to enable/disable sub-headings and dashboard widgets.
+                </p>
+            </div>
+
+            <button type="submit"
+                    class="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg flex items-center gap-2 transition-all cursor-pointer shrink-0">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>Save UI & Dashboard Settings</span>
+            </button>
+        </div>
+
+        <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
+            @foreach($uiSettingDefinitions as $settingKey => $meta)
+            <label class="flex items-start gap-3 p-4 rounded-2xl border transition-colors cursor-pointer {{ !empty($uiSettings[$settingKey]) ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70' }}">
+                <input type="checkbox"
+                       name="ui_settings[]"
+                       value="{{ $settingKey }}"
+                       {{ !empty($uiSettings[$settingKey]) ? 'checked' : '' }}
+                       class="mt-0.5 w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer">
+                <div class="flex-1">
+                    <div class="font-bold text-slate-900 flex items-center gap-2">
+                        <span>{{ $meta['label'] }}</span>
+                        @if($settingKey === 'show_subheadings')
+                        <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-100 text-amber-800">Default: Disabled</span>
+                        @endif
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1 leading-relaxed">{{ $meta['description'] }}</p>
+                </div>
+            </label>
+            @endforeach
         </div>
     </form>
 

@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-tags text-emerald-600"></i>
                 <span>Therapeutic Categories</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-1">Classify medications by pharmacological category (Antibiotics, Analgesics, Antihistamines, etc.).</p>
+            <p class="ui-subheading text-xs text-slate-500 mt-1">Classify medications by pharmacological category (Antibiotics, Analgesics, Antihistamines, etc.).</p>
         </div>
 
         <a href="{{ route('master.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">

@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-receipt text-emerald-600"></i>
                 <span>1. Customer vs Transaction Report</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-1">Detailed drill-down into sales invoices, item lines, and payment settlement modes per customer account.</p>
+            <p class="ui-subheading text-xs text-slate-500 mt-1">Detailed drill-down into sales invoices, item lines, and payment settlement modes per customer account.</p>
         </div>
 
         <a href="{{ route('reports.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">

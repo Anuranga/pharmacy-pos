@@ -20,7 +20,7 @@
                 <i class="fa-solid fa-building-wheat text-emerald-600"></i>
                 <span>Suppliers & Accounts Payable (AP)</span>
             </h1>
-            <p class="text-sm text-slate-500 mt-1">Manage pharmaceutical distributors, credit terms, running liabilities, and payment vouchers.</p>
+            <p class="ui-subheading text-sm text-slate-500 mt-1">Manage pharmaceutical distributors, credit terms, running liabilities, and payment vouchers.</p>
         </div>
 
         <button type="button" @click="addSupplierModal = true"

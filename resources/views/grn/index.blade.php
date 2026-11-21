@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-list-check text-emerald-600"></i>
                 <span>Goods Received Notes (GRN) Register</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-1">Audit log of all drug consignments received from distributors and suppliers.</p>
+            <p class="ui-subheading text-xs text-slate-500 mt-1">Audit log of all drug consignments received from distributors and suppliers.</p>
         </div>
 
         <div class="flex items-center gap-3">

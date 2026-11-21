@@ -121,4 +121,104 @@ class TenantRolePermission extends Model
             );
         }
     }
+
+    /**
+     * Configurable UI & Dashboard Display Settings (Admin Enable/Disable Controls).
+     * Note: 'show_subheadings' is disabled (false) by default as requested by client.
+     */
+    public static function uiSettingDefinitions(): array
+    {
+        return [
+            'show_subheadings' => [
+                'label' => 'Sub-Heading Descriptions (Under Page & Section Titles)',
+                'description' => 'Show descriptive subtitle text such as "Real-time pharmacy sales, FEFO batch expiry radar...", "Latest POS transactions with instant thermal receipt reprint", "Highest outstanding debtor balances & credit limit usage", etc. (Disabled by default for a cleaner interface)',
+                'default' => false,
+            ],
+            'show_kpi_cards' => [
+                'label' => 'Dashboard: Top 6 Financial & Stock KPI Cards',
+                'description' => 'Display Today\'s Revenue, Cash in Drawer, Month Revenue, Customer Debt, Supplier Payable, and Stock Valuation summary cards.',
+                'default' => true,
+            ],
+            'show_revenue_chart' => [
+                'label' => 'Dashboard: Last 7 Days Revenue & Billing Trend Chart',
+                'description' => 'Display daily completed counter sales volume and invoice count bar chart.',
+                'default' => true,
+            ],
+            'show_tender_breakdown' => [
+                'label' => 'Dashboard: Today\'s Tender Breakdown & FEFO Radar',
+                'description' => 'Display live split across payment channels (Cash, Card, LankaQR, Credit) and batch shelf-life status.',
+                'default' => true,
+            ],
+            'show_action_center' => [
+                'label' => 'Dashboard: Pharmacist Operational Action Center',
+                'description' => 'Display tabbed alerts for Negative & Low Stock, FEFO Expiry Watch, and Top Selling Drugs.',
+                'default' => true,
+            ],
+            'show_recent_invoices' => [
+                'label' => 'Dashboard: Recent Counter Invoices (Thermal Receipt Reprint)',
+                'description' => 'Display latest POS transactions table with instant thermal receipt reprint.',
+                'default' => true,
+            ],
+            'show_debtor_watchlist' => [
+                'label' => 'Dashboard: Customer Lending Watchlist (Top Debtors)',
+                'description' => 'Display highest outstanding debtor balances and credit limit usage.',
+                'default' => true,
+            ],
+        ];
+    }
+
+    /**
+     * Retrieve boolean map of UI & Dashboard display settings for a tenant.
+     */
+    public static function getUiSettingsForTenant(?int $tenantId): array
+    {
+        $definitions = static::uiSettingDefinitions();
+        $defaults = [];
+        foreach ($definitions as $key => $meta) {
+            $defaults[$key] = (bool) ($meta['default'] ?? false);
+        }
+
+        if (!$tenantId) {
+            return $defaults;
+        }
+
+        try {
+            $row = static::where('tenant_id', $tenantId)
+                ->where('role_name', 'ui_settings')
+                ->first();
+
+            if (!$row) {
+                return $defaults;
+            }
+
+            $enabledKeys = (array) ($row->permissions ?? []);
+            $resolved = [];
+            foreach ($definitions as $key => $meta) {
+                $resolved[$key] = in_array($key, $enabledKeys, true);
+            }
+
+            return $resolved;
+        } catch (\Throwable $e) {
+            return $defaults;
+        }
+    }
+
+    /**
+     * Save UI & Dashboard display settings for a tenant.
+     */
+    public static function saveUiSettingsForTenant(int $tenantId, array $enabledKeys): void
+    {
+        $validKeys = array_keys(static::uiSettingDefinitions());
+        $cleanKeys = array_values(array_intersect($validKeys, $enabledKeys));
+
+        static::updateOrCreate(
+            [
+                'tenant_id' => $tenantId,
+                'role_name' => 'ui_settings',
+            ],
+            [
+                'permissions' => $cleanKeys,
+            ]
+        );
+    }
 }

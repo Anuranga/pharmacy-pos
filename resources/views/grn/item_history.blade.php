@@ -11,12 +11,19 @@
                 <i class="fa-solid fa-clock-rotate-left text-teal-600"></i>
                 <span>Item-Wise GRN Procurement History</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-1">Select any medication to view historical log of all suppliers who provided the drug, cost price fluctuations, batch numbers, and receipt dates.</p>
+            <p class="ui-subheading text-xs text-slate-500 mt-1">Select any medication to view historical log of all suppliers who provided the drug, cost price fluctuations, batch numbers, and receipt dates.</p>
         </div>
 
-        <a href="{{ route('grn.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">
-            <i class="fa-solid fa-arrow-left"></i> Back to GRN Register
-        </a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('reports.item-vs-transaction', ['product_id' => $selectedProductId]) }}"
+               class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
+                <i class="fa-solid fa-capsules"></i>
+                <span>View Item Sold & GRN Report</span>
+            </a>
+            <a href="{{ route('grn.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-left"></i> Back to GRN Register
+            </a>
+        </div>
     </div>
 
     <!-- Drug Selector Dropdown Card -->

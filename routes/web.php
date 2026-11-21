@@ -49,6 +49,7 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{user}', [StaffController::class, 'updateStaff'])->name('update');
         Route::post('/{user}/password', [StaffController::class, 'changePassword'])->name('password');
         Route::post('/permissions', [StaffController::class, 'updateRolePermissions'])->name('permissions.update');
+        Route::post('/ui-settings', [StaffController::class, 'updateUiSettings'])->name('ui-settings.update');
     });
 
     // Executive & Clinical Operations Dashboard
@@ -134,11 +135,12 @@ Route::middleware(['auth'])->group(function () {
             Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->name('destroy');
         });
 
-        // Management Reports Hub (11 Dedicated Reports)
+        // Management Reports Hub (13 Dedicated Reports)
         Route::prefix('reports')->name('reports.')->group(function () {
             Route::get('/', [ReportController::class, 'index'])->name('index');
             Route::get('/customer-vs-transaction', [ReportController::class, 'customerVsTransaction'])->name('customer-vs-transaction');
             Route::get('/supplier-vs-transaction', [ReportController::class, 'supplierVsTransaction'])->name('supplier-vs-transaction');
+            Route::get('/item-vs-transaction', [ReportController::class, 'itemVsTransaction'])->name('item-vs-transaction');
             Route::get('/customer-aging', [ReportController::class, 'customerAging'])->name('customer-aging');
             Route::get('/customer-balance-summary', [ReportController::class, 'customerBalanceSummary'])->name('customer-balance-summary');
             Route::get('/sales-by-customer', [ReportController::class, 'salesByCustomer'])->name('sales-by-customer');

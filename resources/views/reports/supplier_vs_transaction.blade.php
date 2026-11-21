@@ -11,7 +11,7 @@
                 <i class="fa-solid fa-truck-moving text-sky-600"></i>
                 <span>2. Supplier vs Transaction Report</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-1">Cross-sectional analysis of GRN consignments, invoices, and disbursement payouts per supplier.</p>
+            <p class="ui-subheading text-xs text-slate-500 mt-1">Cross-sectional analysis of GRN consignments, invoices, and disbursement payouts per supplier.</p>
         </div>
 
         <a href="{{ route('reports.index') }}" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5">

@@ -12,7 +12,7 @@
                 <i class="fa-solid fa-boxes-stacked text-emerald-600"></i>
                 <span>Master Drug Directory & Catalog</span>
             </h1>
-            <p class="text-sm text-slate-500 mt-1">Manage all pharmaceuticals, dosage forms, SKU barcodes, and live inventory balances.</p>
+            <p class="ui-subheading text-sm text-slate-500 mt-1">Manage all pharmaceuticals, dosage forms, SKU barcodes, and live inventory balances.</p>
         </div>
 
         <div class="flex items-center gap-3">

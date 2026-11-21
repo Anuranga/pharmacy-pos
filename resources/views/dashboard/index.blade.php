@@ -3,7 +3,15 @@
 @section('title', 'Executive & Clinical Operations Dashboard')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5" x-data="{ activeAlertTab: '{{ $negativeStockProducts->isNotEmpty() ? 'reorder' : 'expiry' }}' }">
+@php
+    $uiSettings = $uiSettings ?? \App\Models\TenantRolePermission::getUiSettingsForTenant(auth()->user()->tenant_id ?? null);
+    $uiSettingDefinitions = $uiSettingDefinitions ?? \App\Models\TenantRolePermission::uiSettingDefinitions();
+@endphp
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5"
+     x-data="{
+         activeAlertTab: '{{ $negativeStockProducts->isNotEmpty() ? 'reorder' : 'expiry' }}',
+         customizeUiModal: false
+     }">
 
     <!-- Top Executive Command Header -->
     <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 rounded-3xl p-5 md:p-6 text-white shadow-xl border border-slate-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -15,7 +23,7 @@
             <h1 class="text-2xl md:text-3xl font-extrabold font-display tracking-tight mt-1">
                 Welcome back, {{ auth()->user()->name }}
             </h1>
-            <p class="text-xs text-slate-300 mt-0.5">
+            <p class="ui-subheading text-xs text-slate-300 mt-0.5">
                 Real-time pharmacy sales, FEFO batch expiry radar, negative/reorder stock alerts, and financial ledger overview.
             </p>
         </div>
@@ -29,6 +37,12 @@
             </a>
 
             @if(auth()->user()->isAdmin())
+            <a href="{{ route('reports.item-vs-transaction') }}"
+               class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 font-semibold text-xs flex items-center gap-2 transition-all">
+                <i class="fa-solid fa-capsules text-emerald-300"></i>
+                <span>Item Sales & GRN</span>
+            </a>
+
             <a href="{{ route('grn.create') }}"
                class="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 font-semibold text-xs flex items-center gap-2 transition-all">
                 <i class="fa-solid fa-truck-ramp-box text-teal-300"></i>
@@ -47,10 +61,21 @@
                 <i class="fa-solid fa-calculator text-amber-300"></i>
                 <span>EOD Z-Report</span>
             </a>
+
+            @if(auth()->user()->isAdmin())
+            <button type="button"
+                    @click="customizeUiModal = true"
+                    title="Enable or Disable Dashboard Sections & Sub-Heading Descriptions"
+                    class="px-3.5 py-2.5 rounded-xl bg-purple-500/25 hover:bg-purple-500/40 text-purple-200 border border-purple-400/30 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer">
+                <i class="fa-solid fa-sliders text-purple-300"></i>
+                <span>Customize View</span>
+            </button>
+            @endif
         </div>
     </div>
 
     <!-- Primary 6 KPI Metric Cards -->
+    @if(!empty($uiSettings['show_kpi_cards']))
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
 
         <!-- 1. Today's Sales Revenue -->
@@ -182,19 +207,22 @@
         </div>
 
     </div>
+    @endif
 
     <!-- Middle Row: 7-Day Revenue Trend Chart (Col 7) & Today's Payment Breakdown + Quick Expiry Summary (Col 5) -->
+    @if(!empty($uiSettings['show_revenue_chart']) || !empty($uiSettings['show_tender_breakdown']))
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
         <!-- 7-Day Sales Performance Bar Chart -->
-        <div class="lg:col-span-7 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
+        @if(!empty($uiSettings['show_revenue_chart']))
+        <div class="{{ !empty($uiSettings['show_tender_breakdown']) ? 'lg:col-span-7' : 'lg:col-span-12' }} bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between">
             <div class="flex items-center justify-between mb-4">
                 <div>
                     <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
                         <i class="fa-solid fa-chart-column text-emerald-600"></i>
                         <span>Last 7 Days Revenue & Billing Trend</span>
                     </h3>
-                    <p class="text-[11px] text-slate-500">Daily completed counter sales volume and invoice count</p>
+                    <p class="ui-subheading text-[11px] text-slate-500">Daily completed counter sales volume and invoice count</p>
                 </div>
                 <div class="text-right font-mono text-xs">
                     <span class="text-slate-400">7-Day Total:</span>
@@ -235,15 +263,17 @@
                 @endforeach
             </div>
         </div>
+        @endif
 
         <!-- Today's Payment Mode Mix & Expiry Alert Summary Pills -->
-        <div class="lg:col-span-5 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-4">
+        @if(!empty($uiSettings['show_tender_breakdown']))
+        <div class="{{ !empty($uiSettings['show_revenue_chart']) ? 'lg:col-span-5' : 'lg:col-span-12' }} bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-4">
             <div>
                 <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
                     <i class="fa-solid fa-wallet text-teal-600"></i>
                     <span>Today's Tender Breakdown & FEFO Radar</span>
                 </h3>
-                <p class="text-[11px] text-slate-500">Live split across payment channels and batch shelf-life status</p>
+                <p class="ui-subheading text-[11px] text-slate-500">Live split across payment channels and batch shelf-life status</p>
             </div>
 
             @php
@@ -312,10 +342,13 @@
                 </div>
             </div>
         </div>
+        @endif
 
     </div>
+    @endif
 
     <!-- Clinical & Inventory Action Center (Tabbed: Reorder/Negative Stock | FEFO Expiry Radar | Top Fast Movers) -->
+    @if(!empty($uiSettings['show_action_center']))
     <div class="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
         <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -515,19 +548,22 @@
             </div>
         </div>
     </div>
+    @endif
 
     <!-- Bottom Grid: Recent POS Counter Bills (Col 7) & Top Customer Debtors (Col 5) -->
+    @if(!empty($uiSettings['show_recent_invoices']) || !empty($uiSettings['show_debtor_watchlist']))
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
         <!-- Recent POS Counter Invoices -->
-        <div class="lg:col-span-7 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs">
+        @if(!empty($uiSettings['show_recent_invoices']))
+        <div class="{{ !empty($uiSettings['show_debtor_watchlist']) ? 'lg:col-span-7' : 'lg:col-span-12' }} bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs">
             <div class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
                         <i class="fa-solid fa-receipt text-emerald-600"></i>
                         <span>Recent Counter Invoices</span>
                     </h3>
-                    <p class="text-[11px] text-slate-500">Latest POS transactions with instant thermal receipt reprint</p>
+                    <p class="ui-subheading text-[11px] text-slate-500">Latest POS transactions with instant thermal receipt reprint</p>
                 </div>
                 <a href="{{ route('pos.index') }}" class="text-xs font-bold text-emerald-600 hover:underline">Go to Counter &rarr;</a>
             </div>
@@ -572,16 +608,18 @@
                 </table>
             </div>
         </div>
+        @endif
 
         <!-- Top Customer Debtor Watchlist -->
-        <div class="lg:col-span-5 bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs">
+        @if(!empty($uiSettings['show_debtor_watchlist']))
+        <div class="{{ !empty($uiSettings['show_recent_invoices']) ? 'lg:col-span-5' : 'lg:col-span-12' }} bg-white rounded-3xl p-5 border border-slate-200/90 shadow-xs">
             <div class="flex items-center justify-between mb-3">
                 <div>
                     <h3 class="font-display font-bold text-sm text-slate-900 flex items-center gap-2">
                         <i class="fa-solid fa-user-clock text-purple-600"></i>
                         <span>Customer Lending Watchlist</span>
                     </h3>
-                    <p class="text-[11px] text-slate-500">Highest outstanding debtor balances & credit limit usage</p>
+                    <p class="ui-subheading text-[11px] text-slate-500">Highest outstanding debtor balances & credit limit usage</p>
                 </div>
                 <a href="{{ route('customers.index') }}" class="text-xs font-bold text-purple-600 hover:underline">All Debtors &rarr;</a>
             </div>
@@ -614,8 +652,73 @@
                 @endforelse
             </div>
         </div>
+        @endif
 
     </div>
+    @endif
+
+    @if(auth()->user()->isAdmin())
+    <!-- ADMIN MODAL: Customize Dashboard Sections & Sub-Heading Descriptions -->
+    <div x-show="customizeUiModal" x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden"
+             @click.outside="customizeUiModal = false">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/30 flex items-center justify-center">
+                        <i class="fa-solid fa-sliders"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-display font-bold text-base text-white">Customize Dashboard & UI Content</h3>
+                        <p class="text-[11px] text-slate-300">Enable or disable sub-heading descriptions and dashboard sections for your pharmacy</p>
+                    </div>
+                </div>
+                <button type="button" @click="customizeUiModal = false" class="text-slate-400 hover:text-white text-xl leading-none cursor-pointer">&times;</button>
+            </div>
+
+            <form method="POST" action="{{ route('staff.ui-settings.update') }}" class="p-6 space-y-4 text-xs">
+                @csrf
+                <div class="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                    @foreach($uiSettingDefinitions as $settingKey => $meta)
+                    <label class="flex items-start gap-3 p-3.5 rounded-2xl border transition-colors cursor-pointer {{ !empty($uiSettings[$settingKey]) ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70' }}">
+                        <input type="checkbox"
+                               name="ui_settings[]"
+                               value="{{ $settingKey }}"
+                               {{ !empty($uiSettings[$settingKey]) ? 'checked' : '' }}
+                               class="mt-0.5 w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer">
+                        <div class="flex-1">
+                            <div class="font-bold text-slate-900 flex items-center gap-2">
+                                <span>{{ $meta['label'] }}</span>
+                                @if($settingKey === 'show_subheadings')
+                                <span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-100 text-amber-800">Default: Off</span>
+                                @endif
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{{ $meta['description'] }}</p>
+                        </div>
+                    </label>
+                    @endforeach
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <a href="{{ route('staff.index') }}" class="text-xs font-bold text-purple-600 hover:underline">
+                        <i class="fa-solid fa-user-gear mr-1"></i> Full Staff & Permissions
+                    </a>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="customizeUiModal = false"
+                                class="px-4 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm cursor-pointer flex items-center gap-1.5">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>Save View Preferences</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    @endif
 
 </div>
 @endsection

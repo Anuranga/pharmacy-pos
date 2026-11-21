@@ -45,7 +45,7 @@
                 <i class="fa-solid fa-users text-emerald-600"></i>
                 <span>Customer Directory & Debtor Lending</span>
             </h1>
-            <p class="text-sm text-slate-500 mt-1">Register new customers, edit customer profiles, manage approved credit limits, and track ledger tabs.</p>
+            <p class="ui-subheading text-sm text-slate-500 mt-1">Register new customers, edit customer profiles, manage approved credit limits, and track ledger tabs.</p>
         </div>
 
         <button type="button" @click="addCustomerModal = true"

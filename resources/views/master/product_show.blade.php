@@ -13,6 +13,11 @@
         </a>
 
         <div class="flex items-center gap-2">
+            <a href="{{ route('reports.item-vs-transaction', ['product_id' => $product->id]) }}"
+               class="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5">
+                <i class="fa-solid fa-chart-column"></i>
+                <span>Item Sales & GRN Report</span>
+            </a>
             <a href="{{ route('master.products.edit', $product->id) }}" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5">
                 <i class="fa-solid fa-pen-to-square"></i>
                 <span>Edit Medication</span>

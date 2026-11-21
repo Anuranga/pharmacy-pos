@@ -52,9 +52,17 @@
     <!-- FontAwesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <!-- Thermal Print Styles -->
+    <!-- Thermal Print & UI Subheading Visibility Styles -->
+    @php
+        $globalUiSettings = auth()->check()
+            ? \App\Models\TenantRolePermission::getUiSettingsForTenant(auth()->user()->tenant_id)
+            : ['show_subheadings' => false];
+    @endphp
     <style>
         [x-cloak] { display: none !important; }
+        @if(empty($globalUiSettings['show_subheadings']))
+        .ui-subheading { display: none !important; }
+        @endif
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
@@ -268,8 +276,11 @@
                             <!-- Inventory & Suppliers -->
                             <div class="py-1">
                                 <div class="px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">Inventory & Financials</div>
+                                <a href="{{ route('reports.item-vs-transaction') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-semibold">
+                                    <i class="fa-solid fa-capsules w-5 text-emerald-400"></i> 13. Item vs Transaction (Sold & GRN)
+                                </a>
                                 <a href="{{ route('reports.item-stock-movement') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400 font-semibold">
-                                    <i class="fa-solid fa-arrows-left-right-to-line w-5 text-emerald-400"></i> 12. Item Stock Movement (PDF/Excel)
+                                    <i class="fa-solid fa-arrows-left-right-to-line w-5 text-teal-400"></i> 12. Item Stock Movement (PDF/Excel)
                                 </a>
                                 <a href="{{ route('reports.expiry-alerts') }}" class="block px-4 py-2 text-slate-200 hover:bg-slate-800 hover:text-emerald-400">
                                     <i class="fa-solid fa-triangle-exclamation w-5 text-amber-500"></i> 9. FEFO Expiry Alerts

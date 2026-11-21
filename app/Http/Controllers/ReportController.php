@@ -642,4 +642,171 @@ class ReportController extends Controller
             'selectedProductIds'
         ));
     }
+
+    /**
+     * 13. Item vs Transaction Report (Drug-Wise Sales Invoices & GRN Procurement Report)
+     * View how a selected drug/item has been sold in a given date period (with sold quantities,
+     * unit selling prices, sold amounts, and instant Invoice preview/reprint) alongside how it was
+     * received via GRN (supplier, batch, cost/retail price, and instant GRN voucher preview) on the same page.
+     */
+    public function itemVsTransaction(Request $request)
+    {
+        $products = Product::with(['category', 'batches'])->orderBy('brand_name')->get();
+
+        // Default to the most recently sold product if product_id parameter wasn't explicitly passed
+        if ($request->has('product_id')) {
+            $selectedProductId = $request->get('product_id');
+        } else {
+            $latestSoldItem = SaleItem::whereHas('sale', fn($q) => $q->where('status', 'completed'))
+                ->latest()
+                ->first();
+            $selectedProductId = $latestSoldItem ? $latestSoldItem->product_id : $products->first()?->id;
+        }
+
+        $selectedProduct = $selectedProductId ? $products->firstWhere('id', (int) $selectedProductId) : null;
+
+        // Date range handling (supports empty for All Time, or start_date & end_date)
+        $preset = $request->get('preset', '');
+        if ($preset === 'today') {
+            $startDate = now()->toDateString();
+            $endDate = now()->toDateString();
+        } elseif ($preset === 'yesterday') {
+            $startDate = now()->subDay()->toDateString();
+            $endDate = now()->subDay()->toDateString();
+        } elseif ($preset === 'last_7_days') {
+            $startDate = now()->subDays(6)->toDateString();
+            $endDate = now()->toDateString();
+        } elseif ($preset === 'this_month') {
+            $startDate = now()->startOfMonth()->toDateString();
+            $endDate = now()->toDateString();
+        } elseif ($preset === 'all_time') {
+            $startDate = '';
+            $endDate = '';
+        } else {
+            $startDate = $request->has('start_date')
+                ? (string) $request->get('start_date')
+                : now()->startOfMonth()->toDateString();
+            $endDate = $request->has('end_date')
+                ? (string) $request->get('end_date')
+                : now()->toDateString();
+        }
+
+        if ($startDate !== '' && $endDate !== '' && $startDate > $endDate) {
+            [$startDate, $endDate] = [$endDate, $startDate];
+        }
+
+        $grnScope = $request->get('grn_scope', 'auto'); // 'auto', 'period', 'all'
+
+        // 1. Query Sold Line Items (POS Sales)
+        $saleItemsQuery = SaleItem::with([
+                'sale.customer',
+                'sale.cashier',
+                'sale.items.product',
+                'product',
+                'batch',
+            ])
+            ->whereHas('sale', function ($q) use ($startDate, $endDate) {
+                $q->where('status', 'completed');
+                if ($startDate !== '') {
+                    $q->whereDate('created_at', '>=', $startDate);
+                }
+                if ($endDate !== '') {
+                    $q->whereDate('created_at', '<=', $endDate);
+                }
+            })
+            ->join('sales', 'sale_items.sale_id', '=', 'sales.id')
+            ->orderBy('sales.created_at', 'desc')
+            ->select('sale_items.*');
+
+        if ($selectedProductId) {
+            $saleItemsQuery->where('sale_items.product_id', $selectedProductId);
+        }
+
+        $allMatchingSaleItems = (clone $saleItemsQuery)->get();
+        $saleItems = $saleItemsQuery->paginate(20, ['*'], 'sales_page');
+
+        $salesSummary = [
+            'total_qty_sold' => (int) $allMatchingSaleItems->sum('quantity'),
+            'total_sold_amount' => (float) $allMatchingSaleItems->sum('subtotal'),
+            'total_cogs' => (float) $allMatchingSaleItems->sum(fn($i) => $i->quantity * (float) $i->cost_price),
+            'invoices_count' => $allMatchingSaleItems->pluck('sale_id')->unique()->count(),
+            'lines_count' => $allMatchingSaleItems->count(),
+        ];
+        $salesSummary['gross_profit'] = $salesSummary['total_sold_amount'] - $salesSummary['total_cogs'];
+
+        // 2. Query GRN Consignment Line Items (How item was received)
+        $baseGrnQuery = GrnItem::with([
+                'grn.supplier',
+                'grn.receiver',
+                'grn.items.product',
+                'product',
+            ])
+            ->join('grns', 'grn_items.grn_id', '=', 'grns.id')
+            ->orderBy('grns.invoice_date', 'desc')
+            ->orderBy('grn_items.id', 'desc')
+            ->select('grn_items.*');
+
+        if ($selectedProductId) {
+            $baseGrnQuery->where('grn_items.product_id', $selectedProductId);
+        }
+
+        $periodGrnQuery = clone $baseGrnQuery;
+        if ($startDate !== '') {
+            $periodGrnQuery->where(function ($q) use ($startDate) {
+                $q->whereDate('grns.invoice_date', '>=', $startDate)
+                  ->orWhereDate('grn_items.created_at', '>=', $startDate);
+            });
+        }
+        if ($endDate !== '') {
+            $periodGrnQuery->where(function ($q) use ($endDate) {
+                $q->whereDate('grns.invoice_date', '<=', $endDate)
+                  ->orWhereDate('grn_items.created_at', '<=', $endDate);
+            });
+        }
+
+        $periodGrnCount = (clone $periodGrnQuery)->count();
+        $showingHistoricalGrnsFallback = false;
+
+        if ($grnScope === 'all') {
+            $activeGrnQuery = $baseGrnQuery;
+        } elseif ($grnScope === 'period') {
+            $activeGrnQuery = $periodGrnQuery;
+        } else {
+            // 'auto': if GRNs exist in the selected period, show period GRNs;
+            // if 0 GRNs in that narrow period (e.g., Yesterday) and an item is selected, fallback to showing all historical GRNs for that item
+            if ($periodGrnCount > 0 || !$selectedProductId) {
+                $activeGrnQuery = $periodGrnQuery;
+            } else {
+                $activeGrnQuery = $baseGrnQuery;
+                $showingHistoricalGrnsFallback = ($startDate !== '' || $endDate !== '');
+            }
+        }
+
+        $allMatchingGrnItems = (clone $activeGrnQuery)->get();
+        $grnItems = $activeGrnQuery->paginate(20, ['*'], 'grn_page');
+
+        $grnSummary = [
+            'total_qty_received' => (int) $allMatchingGrnItems->sum('quantity_received'),
+            'total_bonus_received' => (int) $allMatchingGrnItems->sum('free_bonus_qty'),
+            'total_units_added' => (int) $allMatchingGrnItems->sum(fn($g) => $g->quantity_received + $g->free_bonus_qty),
+            'total_grn_amount' => (float) $allMatchingGrnItems->sum('subtotal'),
+            'grns_count' => $allMatchingGrnItems->pluck('grn_id')->unique()->count(),
+            'period_grn_count' => $periodGrnCount,
+        ];
+
+        return view('reports.item_vs_transaction', compact(
+            'products',
+            'selectedProduct',
+            'selectedProductId',
+            'startDate',
+            'endDate',
+            'preset',
+            'grnScope',
+            'showingHistoricalGrnsFallback',
+            'saleItems',
+            'salesSummary',
+            'grnItems',
+            'grnSummary'
+        ));
+    }
 }

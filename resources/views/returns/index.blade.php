@@ -17,7 +17,7 @@
                 <i class="fa-solid fa-rotate-left text-emerald-600"></i>
                 <span>Customer & Shop (GRN) Returns Hub</span>
             </h1>
-            <p class="text-xs text-slate-500 mt-0.5">
+            <p class="ui-subheading text-xs text-slate-500 mt-0.5">
                 Process customer billed item returns (restock or write-off) and shop GRN consignment returns to suppliers.
             </p>
         </div>

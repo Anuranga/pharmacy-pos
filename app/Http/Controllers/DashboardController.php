@@ -10,6 +10,7 @@ use App\Models\ProductBatch;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Supplier;
+use App\Models\TenantRolePermission;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -163,6 +164,10 @@ class DashboardController extends Controller
             ->limit(5)
             ->get();
 
+        $tenantId = auth()->check() ? auth()->user()->tenant_id : null;
+        $uiSettingDefinitions = TenantRolePermission::uiSettingDefinitions();
+        $uiSettings = TenantRolePermission::getUiSettingsForTenant($tenantId);
+
         return view('dashboard.index', compact(
             'todayRevenue',
             'todayBillsCount',
@@ -195,7 +200,9 @@ class DashboardController extends Controller
             'maxDailyRevenue',
             'topSellingProducts',
             'recentSales',
-            'recentGrns'
+            'recentGrns',
+            'uiSettingDefinitions',
+            'uiSettings'
         ));
     }
 }

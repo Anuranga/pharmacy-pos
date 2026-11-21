@@ -41,11 +41,16 @@ class StaffController extends Controller
             $rolePermissions[$rName] = $row ? (array) ($row->permissions ?? []) : TenantRolePermission::defaultPermissionsForRole($rName);
         }
 
+        $uiSettingDefinitions = TenantRolePermission::uiSettingDefinitions();
+        $uiSettings = TenantRolePermission::getUiSettingsForTenant($tenantId);
+
         return view('staff.index', compact(
             'staffMembers',
             'assignableRoles',
             'permissionGroups',
-            'rolePermissions'
+            'rolePermissions',
+            'uiSettingDefinitions',
+            'uiSettings'
         ));
     }
 
@@ -157,5 +162,21 @@ class StaffController extends Controller
         }
 
         return back()->with('success', 'Role-wise permissions updated and applied immediately for Managers, Cashiers, and Staff.');
+    }
+
+    /**
+     * Save Admin UI & Dashboard Content Visibility Preferences (Sub-headings & Dashboard Sections).
+     */
+    public function updateUiSettings(Request $request)
+    {
+        $tenantId = Auth::user()->tenant_id;
+        if (!$tenantId) {
+            return back()->with('error', 'No active pharmacy tenant found.');
+        }
+
+        $enabledKeys = (array) $request->input('ui_settings', []);
+        TenantRolePermission::saveUiSettingsForTenant($tenantId, $enabledKeys);
+
+        return back()->with('success', 'Interface & Dashboard display preferences updated successfully.');
     }
 }
