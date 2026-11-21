@@ -3,6 +3,19 @@
 @section('title', 'New Goods Received Note (GRN)')
 
 @section('content')
+@php
+    $grnCatalogJson = $products->map(fn($p) => [
+        'id' => $p->id,
+        'barcode_sku' => $p->barcode_sku,
+        'brand_name' => $p->brand_name,
+        'generic_name' => $p->generic_name ?? '',
+        'dosage_strength' => $p->dosage_strength ?? '',
+        'base_uom' => $p->base_uom ?? 'Tablet',
+        'units_per_pack' => max(1, (int) ($p->units_per_pack ?? 1)),
+        'cost_price' => (float) $p->unit_cost_price,
+        'retail_price' => (float) $p->unit_retail_price,
+    ])->values();
+@endphp
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6" x-data="grnEntry()">
     
     <!-- Header -->
@@ -93,24 +106,51 @@
                     <tbody class="divide-y divide-slate-100">
                         <template x-for="(line, index) in lines" :key="index">
                             <tr class="hover:bg-slate-50/60 transition-colors align-top">
-                                <!-- Drug Select -->
+                                <!-- Drug Search & Select Autocomplete -->
                                 <td class="py-2.5 px-2">
-                                    <select :name="'items[' + index + '][product_id]'" 
-                                            x-model="line.product_id"
-                                            @change="onProductSelect(index)"
-                                            required 
-                                            class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-emerald-500">
-                                        <option value="">-- Select Drug --</option>
-                                        @foreach($products as $p)
-                                        <option value="{{ $p->id }}"
-                                                data-cost="{{ $p->unit_cost_price }}"
-                                                data-retail="{{ $p->unit_retail_price }}"
-                                                data-uom="{{ $p->base_uom ?? 'Tablet' }}"
-                                                data-pack="{{ $p->units_per_pack ?? 1 }}">
-                                            {{ $p->brand_name }} ({{ $p->dosage_strength }})
-                                        </option>
-                                        @endforeach
-                                    </select>
+                                    <div class="relative" @click.outside="line.dropdownOpen = false">
+                                        <input type="hidden" :name="'items[' + index + '][product_id]'" :value="line.product_id" required>
+                                        <div class="relative">
+                                            <i class="fa-solid fa-magnifying-glass text-slate-400 text-[11px] absolute left-2.5 top-2"></i>
+                                            <input type="text"
+                                                   x-model="line.searchQuery"
+                                                   @focus="line.dropdownOpen = true"
+                                                   @input="line.dropdownOpen = true; line.product_id = ''"
+                                                   placeholder="Type letters to search drug..."
+                                                   :class="line.product_id ? 'border-emerald-400 bg-emerald-50/40 text-emerald-950 font-bold' : 'border-slate-300 bg-white text-slate-800'"
+                                                   class="w-full pl-7 pr-6 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                                            <button type="button"
+                                                    x-show="line.searchQuery"
+                                                    @click="clearLineProduct(index)"
+                                                    class="absolute right-2 top-1.5 text-slate-400 hover:text-rose-500 text-xs">
+                                                &times;
+                                            </button>
+                                        </div>
+
+                                        <!-- Autocomplete Matching Drugs Dropdown -->
+                                        <div x-show="line.dropdownOpen" x-cloak
+                                             class="absolute left-0 right-0 mt-1 min-w-[270px] bg-white border border-slate-200 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 divide-y divide-slate-100">
+                                            <template x-for="prod in filterProducts(line.searchQuery)" :key="prod.id">
+                                                <button type="button"
+                                                        @click="selectProductForLine(index, prod)"
+                                                        class="w-full text-left px-3 py-2 hover:bg-emerald-50 transition-colors flex items-center justify-between gap-2">
+                                                    <div class="min-w-0">
+                                                        <div class="font-bold text-slate-900 text-xs truncate" x-text="prod.brand_name + (prod.dosage_strength ? ' (' + prod.dosage_strength + ')' : '')"></div>
+                                                        <div class="text-[10px] text-slate-400 font-mono truncate" x-text="(prod.generic_name || prod.barcode_sku) + ' · 1 Pk=' + prod.units_per_pack + ' ' + prod.base_uom"></div>
+                                                    </div>
+                                                    <div class="text-right shrink-0">
+                                                        <span class="text-[10px] font-mono font-bold text-emerald-700 block" x-text="'Rs.' + prod.retail_price.toFixed(2)"></span>
+                                                        <span class="text-[9px] text-slate-400 font-mono" x-text="'Cost: ' + prod.cost_price.toFixed(2)"></span>
+                                                    </div>
+                                                </button>
+                                            </template>
+                                            <template x-if="filterProducts(line.searchQuery).length === 0">
+                                                <div class="px-3 py-2.5 text-[11px] text-slate-400 text-center">
+                                                    No matching drug found for "<span x-text="line.searchQuery"></span>"
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
                                 </td>
 
                                 <!-- UOM Mode (Unit/Tablet vs Pack) & Pack Size -->
@@ -312,14 +352,17 @@
 <script>
 function grnEntry() {
     return {
+        catalog: @json($grnCatalogJson),
         lines: [
-            { product_id: '', purchase_uom: 'unit', base_uom: 'Tablet', units_per_pack: 1, batch_number: '', expiry_date: '', quantity_received: 5, free_bonus_qty: 0, cost_price: 0, retail_price: 0, pack_cost_price: 0, pack_retail_price: 0 },
-            { product_id: '', purchase_uom: 'unit', base_uom: 'Tablet', units_per_pack: 1, batch_number: '', expiry_date: '', quantity_received: 5, free_bonus_qty: 0, cost_price: 0, retail_price: 0, pack_cost_price: 0, pack_retail_price: 0 }
+            { product_id: '', searchQuery: '', dropdownOpen: false, purchase_uom: 'unit', base_uom: 'Tablet', units_per_pack: 1, batch_number: '', expiry_date: '', quantity_received: 5, free_bonus_qty: 0, cost_price: 0, retail_price: 0, pack_cost_price: 0, pack_retail_price: 0 },
+            { product_id: '', searchQuery: '', dropdownOpen: false, purchase_uom: 'unit', base_uom: 'Tablet', units_per_pack: 1, batch_number: '', expiry_date: '', quantity_received: 5, free_bonus_qty: 0, cost_price: 0, retail_price: 0, pack_cost_price: 0, pack_retail_price: 0 }
         ],
 
         addLineItem() {
             this.lines.push({
                 product_id: '',
+                searchQuery: '',
+                dropdownOpen: false,
                 purchase_uom: 'unit',
                 base_uom: 'Tablet',
                 units_per_pack: 1,
@@ -334,30 +377,46 @@ function grnEntry() {
             });
         },
 
+        filterProducts(query) {
+            const q = (query || '').trim().toLowerCase();
+            if (!q) return this.catalog.slice(0, 25);
+            const words = q.split(/\s+/);
+            return this.catalog.filter(p => {
+                const hay = (p.brand_name + ' ' + p.generic_name + ' ' + p.barcode_sku + ' ' + p.dosage_strength).toLowerCase();
+                return words.every(w => hay.includes(w));
+            }).slice(0, 25);
+        },
+
+        selectProductForLine(index, prod) {
+            const line = this.lines[index];
+            const unitCost = parseFloat(prod.cost_price) || 0;
+            const unitRetail = parseFloat(prod.retail_price) || 0;
+            const packSize = Math.max(1, parseInt(prod.units_per_pack) || 1);
+
+            line.product_id = prod.id;
+            line.searchQuery = prod.brand_name + (prod.dosage_strength ? ' (' + prod.dosage_strength + ')' : '');
+            line.dropdownOpen = false;
+            line.base_uom = prod.base_uom || 'Tablet';
+            line.units_per_pack = packSize;
+            line.purchase_uom = packSize > 1 ? 'pack' : 'unit';
+            line.cost_price = unitCost;
+            line.retail_price = unitRetail;
+            line.pack_cost_price = parseFloat((unitCost * packSize).toFixed(2));
+            line.pack_retail_price = parseFloat((unitRetail * packSize).toFixed(2));
+        },
+
+        clearLineProduct(index) {
+            const line = this.lines[index];
+            line.product_id = '';
+            line.searchQuery = '';
+            line.dropdownOpen = true;
+        },
+
         removeLineItem(index) {
             if (this.lines.length > 1) {
                 this.lines.splice(index, 1);
             } else {
                 Swal.fire({ icon: 'info', title: 'Line Item Required', text: 'At least one line item is required for a GRN.' });
-            }
-        },
-
-        onProductSelect(index) {
-            const select = document.querySelector(`select[name="items[${index}][product_id]"]`);
-            if (select && select.selectedIndex > 0) {
-                const opt = select.options[select.selectedIndex];
-                const line = this.lines[index];
-                const unitCost = parseFloat(opt.dataset.cost) || 0;
-                const unitRetail = parseFloat(opt.dataset.retail) || 0;
-                const packSize = Math.max(1, parseInt(opt.dataset.pack) || 1);
-
-                line.base_uom = opt.dataset.uom || 'Tablet';
-                line.units_per_pack = packSize;
-                line.purchase_uom = packSize > 1 ? 'pack' : 'unit';
-                line.cost_price = unitCost;
-                line.retail_price = unitRetail;
-                line.pack_cost_price = parseFloat((unitCost * packSize).toFixed(2));
-                line.pack_retail_price = parseFloat((unitRetail * packSize).toFixed(2));
             }
         },
 
@@ -436,6 +495,12 @@ function grnEntry() {
             if (this.lines.length === 0) {
                 e.preventDefault();
                 Swal.fire({ icon: 'error', title: 'Empty GRN', text: 'Please add at least one drug line item.' });
+                return;
+            }
+            const missingDrug = this.lines.some(l => !l.product_id);
+            if (missingDrug) {
+                e.preventDefault();
+                Swal.fire({ icon: 'warning', title: 'Select Drug from List', text: 'Please search and click a drug from the dropdown for every line item.' });
             }
         }
     };

@@ -73,6 +73,8 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/{customer}', [CustomerController::class, 'update'])->name('update');
         Route::post('/{customer}/settle', [CustomerController::class, 'settle'])->name('settle');
         Route::post('/{customer}/extra-payment', [CustomerController::class, 'extraPayment'])->name('extra-payment');
+        Route::post('/{customer}/adjust-balance', [CustomerController::class, 'adjustBalance'])->middleware('role:admin')->name('adjust-balance');
+        Route::delete('/{customer}', [CustomerController::class, 'destroy'])->middleware('role:admin')->name('destroy');
     });
 
     // Returns Hub: Customer Billed Returns & Shop GRN Returns
@@ -108,6 +110,7 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/categories', [MasterDataController::class, 'categories'])->name('categories');
             Route::post('/categories', [MasterDataController::class, 'storeCategory'])->name('categories.store');
             Route::put('/categories/{category}', [MasterDataController::class, 'updateCategory'])->name('categories.update');
+            Route::delete('/categories/{category}', [MasterDataController::class, 'destroyCategory'])->name('categories.destroy');
             Route::post('/adjust-stock', [MasterDataController::class, 'adjustStock'])->name('adjust-stock');
         });
 
@@ -127,6 +130,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/{supplier}', [SupplierController::class, 'show'])->name('show');
             Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
             Route::post('/{supplier}/pay', [SupplierController::class, 'pay'])->name('pay');
+            Route::post('/{supplier}/adjust-balance', [SupplierController::class, 'adjustBalance'])->name('adjust-balance');
+            Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->name('destroy');
         });
 
         // Management Reports Hub (11 Dedicated Reports)

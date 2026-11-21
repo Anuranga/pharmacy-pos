@@ -66,13 +66,23 @@
                         <p class="text-xs text-slate-500 mt-0.5">{{ $cat->description ?? 'No description provided.' }}</p>
                     </div>
 
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2.5">
                         <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
                             {{ $cat->products_count }} products
                         </span>
                         <a href="{{ route('master.index', ['category_id' => $cat->id]) }}" class="text-xs font-semibold text-emerald-600 hover:text-emerald-800">
                             View Drugs &rarr;
                         </a>
+                        @if(auth()->user()->isAdmin())
+                        <form method="POST" action="{{ route('master.categories.destroy', $cat->id) }}" class="inline"
+                              onsubmit="confirmDeleteForm(event, '{{ addslashes($cat->name) }}', 'Therapeutic Category')">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white transition-colors text-xs cursor-pointer" title="Delete Category">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </form>
+                        @endif
                     </div>
                 </div>
                 @endforeach

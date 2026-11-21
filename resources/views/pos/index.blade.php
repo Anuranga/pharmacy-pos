@@ -796,6 +796,86 @@
         </div>
     </div>
 
+    <!-- MODAL 5: Confirm & Proceed Transaction Popup Window -->
+    <div x-show="openCheckoutConfirmModal" x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200" @click.outside="openCheckoutConfirmModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-display font-extrabold text-base text-slate-900">Confirm & Proceed Transaction</h3>
+                        <p class="text-[11px] text-slate-500">Review bill details before completing checkout</p>
+                    </div>
+                </div>
+                <button @click="openCheckoutConfirmModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+
+            <div class="mt-4 space-y-3 text-xs">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Customer:</span>
+                        <strong class="text-slate-900" x-text="selectedCustomer ? selectedCustomer.name : 'Walk-in Customer'"></strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Payment Mode:</span>
+                        <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold uppercase font-mono text-[10px]" x-text="paymentType.replace('_', ' ')"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Line Items:</span>
+                        <strong class="font-mono text-slate-800" x-text="cart.length + ' item(s)'"></strong>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Subtotal:</span>
+                        <span class="font-mono font-semibold text-slate-800" x-text="'Rs. ' + subtotal.toFixed(2)"></span>
+                    </div>
+                    <template x-if="(parseFloat(discountAmount) || 0) !== 0">
+                        <div class="flex justify-between">
+                            <span class="text-slate-500">Discount / Adjustment:</span>
+                            <span class="font-mono font-semibold text-amber-700" x-text="'Rs. ' + (parseFloat(discountAmount) || 0).toFixed(2)"></span>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                    <div class="flex items-baseline justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Grand Total Bill</span>
+                        <span class="text-2xl font-black font-display text-emerald-400 font-mono" x-text="'Rs. ' + grandTotal.toFixed(2)"></span>
+                    </div>
+
+                    <template x-if="paymentType === 'cash'">
+                        <div class="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                            <div>
+                                <span class="text-slate-400">Cash Tendered:</span>
+                                <strong class="font-mono text-white ml-1" x-text="'Rs. ' + ((parseFloat(tenderedAmount) || grandTotal)).toFixed(2)"></strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">Change Return:</span>
+                                <strong class="font-mono text-teal-400 ml-1" x-text="'Rs. ' + Math.max(0, ((parseFloat(tenderedAmount) || grandTotal) - grandTotal)).toFixed(2)"></strong>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mt-5 pt-3 border-t border-slate-100">
+                <button type="button"
+                        @click="openCheckoutConfirmModal = false"
+                        class="py-2.5 px-4 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-colors cursor-pointer">
+                    Cancel Transaction
+                </button>
+                <button type="button"
+                        @click="openCheckoutConfirmModal = false; submitCheckout(true)"
+                        class="py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+                    <i class="fa-solid fa-check-circle"></i>
+                    <span>Proceed & Complete Bill</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 
@@ -826,6 +906,7 @@ function posTerminal() {
         openCustomerModal: false,
         showReceiptModal: false,
         openBatchPriceModal: false,
+        openCheckoutConfirmModal: false,
         pendingPriceProduct: null,
         pendingPriceUnit: null,
         currentReceiptUrl: '',
@@ -874,6 +955,10 @@ function posTerminal() {
         },
 
         handleEscape() {
+            if (this.openCheckoutConfirmModal) {
+                this.openCheckoutConfirmModal = false;
+                return;
+            }
             if (this.openBatchPriceModal) {
                 this.openBatchPriceModal = false;
                 return;
@@ -1151,10 +1236,10 @@ function posTerminal() {
         },
 
         // Checkout & Transaction Execution
-        async submitCheckout() {
+        async submitCheckout(confirmed = false) {
             if (this.cart.length === 0) return;
 
-            // Check if Rx or controlled item is in cart
+            // 1. Check if Rx or controlled item is in cart
             const hasControlled = this.cart.some(i => i.is_controlled);
             if (hasControlled && (!this.doctorName || !this.patientName)) {
                 Swal.fire({
@@ -1166,7 +1251,28 @@ function posTerminal() {
                 return;
             }
 
-            // Check lending limit
+            // 2. Prevent Walk-in / Cash Underpayment (e.g., Bill is 270 and cashier enters 200)
+            if (this.paymentType === 'cash' && this.tenderedAmount !== '' && this.tenderedAmount !== null) {
+                const enteredCash = parseFloat(this.tenderedAmount);
+                if (!isNaN(enteredCash) && (enteredCash + 0.005) < this.grandTotal) {
+                    const shortfall = (this.grandTotal - enteredCash).toFixed(2);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Insufficient Cash Tendered!',
+                        html: `<div class="text-left text-xs bg-rose-50 p-3.5 rounded-2xl border border-rose-200 space-y-1.5 mt-2">
+                                <div class="flex justify-between"><span class="text-slate-600">Total Bill Amount:</span> <strong class="font-mono text-slate-900">Rs. ${this.grandTotal.toFixed(2)}</strong></div>
+                                <div class="flex justify-between"><span class="text-slate-600">Cash Entered:</span> <strong class="font-mono text-rose-600">Rs. ${enteredCash.toFixed(2)}</strong></div>
+                                <div class="flex justify-between pt-1 border-t border-rose-200"><span class="font-bold text-rose-800">Shortfall Amount:</span> <strong class="font-mono text-rose-700">Rs. ${shortfall}</strong></div>
+                               </div>
+                               <p class="text-xs text-slate-500 mt-2.5">Walk-in / Cash transactions cannot be completed for less than the bill total. Please enter at least <strong>Rs. ${this.grandTotal.toFixed(2)}</strong> or switch to a registered customer under <strong>Lending</strong>.</p>`,
+                        confirmButtonColor: '#e11d48',
+                        confirmButtonText: 'Fix Tendered Cash'
+                    });
+                    return;
+                }
+            }
+
+            // 3. Check lending limit
             if (this.paymentType === 'credit_lending') {
                 if (!this.selectedCustomer) {
                     this.selectLendingMode();
@@ -1182,6 +1288,12 @@ function posTerminal() {
                     });
                     return;
                 }
+            }
+
+            // 4. Show Confirm & Proceed Transaction Popup Window before final submission
+            if (!confirmed) {
+                this.openCheckoutConfirmModal = true;
+                return;
             }
 
             this.isProcessing = true;

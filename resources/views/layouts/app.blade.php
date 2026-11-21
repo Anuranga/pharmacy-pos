@@ -393,6 +393,83 @@
         @yield('content')
     </main>
 
+    <!-- Global Confirmation & Notification Helpers -->
+    <script>
+        function confirmDeleteForm(event, itemName, itemType = 'Record') {
+            event.preventDefault();
+            const form = event.target;
+            Swal.fire({
+                title: `Delete ${itemType}?`,
+                html: `Are you sure you want to delete <strong>${itemName}</strong>?<br><span class="text-xs text-slate-500 mt-1 block">This action will remove the ${itemType.toLowerCase()} from your active records.</span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e11d48',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: '<i class="fa-solid fa-trash-can mr-1"></i> Yes, Delete',
+                cancelButtonText: 'Cancel',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        }
+
+        function confirmBalanceAdjustment(event, entityName, entityType = 'Account') {
+            event.preventDefault();
+            const form = event.target;
+            const modeSelect = form.querySelector('[name="adjustment_mode"]');
+            const amountInput = form.querySelector('[name="amount"]');
+            const modeText = modeSelect ? modeSelect.options[modeSelect.selectedIndex].text : 'Adjust Balance';
+            const amountVal = amountInput ? parseFloat(amountInput.value || 0).toFixed(2) : '0.00';
+
+            Swal.fire({
+                title: `Confirm ${entityType} Balance Adjustment?`,
+                html: `<div class="text-left text-xs bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1 mt-2">
+                        <div><span class="text-slate-500">${entityType}:</span> <strong class="text-slate-900">${entityName}</strong></div>
+                        <div><span class="text-slate-500">Adjustment Mode:</span> <strong class="text-indigo-700">${modeText}</strong></div>
+                        <div><span class="text-slate-500">Adjustment Amount:</span> <strong class="font-mono text-emerald-700">Rs. ${amountVal}</strong></div>
+                       </div>
+                       <p class="text-xs text-slate-500 mt-2">Click <strong>Confirm & Proceed</strong> to save this balance change to the ledger.</p>`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#059669',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: '<i class="fa-solid fa-check-circle mr-1"></i> Confirm & Proceed',
+                cancelButtonText: 'Cancel',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            @if(session('success'))
+            Swal.fire({
+                icon: 'success',
+                title: 'Success',
+                text: @json(session('success')),
+                timer: 3200,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end',
+                timerProgressBar: true
+            });
+            @endif
+
+            @if(session('error'))
+            Swal.fire({
+                icon: 'error',
+                title: 'Action Blocked / Error',
+                text: @json(session('error')),
+                confirmButtonColor: '#e11d48'
+            });
+            @endif
+        });
+    </script>
+
     @stack('scripts')
 </body>
 </html>

@@ -17,11 +17,12 @@
                 <i class="fa-solid fa-pen-to-square"></i>
                 <span>Edit Medication</span>
             </a>
-            <form method="POST" action="{{ route('master.products.destroy', $product->id) }}" onsubmit="return confirm('Are you sure you want to archive this drug?');">
+            <form method="POST" action="{{ route('master.products.destroy', $product->id) }}"
+                  onsubmit="confirmDeleteForm(event, '{{ addslashes($product->brand_name) }}', 'Medication Item')">
                 @csrf
                 @method('DELETE')
-                <button type="submit" class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-600 hover:bg-rose-50 text-xs font-semibold">
-                    <i class="fa-solid fa-trash mr-1"></i> Archive Drug
+                <button type="submit" class="px-3 py-1.5 rounded-xl border border-rose-300 text-rose-600 hover:bg-rose-50 text-xs font-semibold cursor-pointer">
+                    <i class="fa-solid fa-trash mr-1"></i> Delete Item
                 </button>
             </form>
         </div>

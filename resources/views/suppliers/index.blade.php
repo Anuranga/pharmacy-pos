@@ -3,7 +3,16 @@
 @section('title', 'Suppliers & Accounts Payable')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6" x-data="{ addSupplierModal: false }">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6"
+     x-data="{
+         addSupplierModal: false,
+         adjustBalanceModal: false,
+         adjustSupplier: { id: '', name: '', current_balance: 0 },
+         openAdjustModal(sup) {
+             this.adjustSupplier = sup;
+             this.adjustBalanceModal = true;
+         }
+     }">
     
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
@@ -99,9 +108,26 @@
                             Rs. {{ number_format($s->current_balance, 2) }}
                         </td>
                         <td class="py-3 px-4 text-right">
-                            <a href="{{ route('suppliers.show', $s->id) }}" class="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold transition-colors">
-                                Ledger & Pay &rarr;
-                            </a>
+                            <div class="flex items-center justify-end gap-1.5">
+                                <button type="button"
+                                        @click="openAdjustModal({ id: {{ $s->id }}, name: @js($s->name), current_balance: {{ (float) $s->current_balance }} })"
+                                        class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                        title="Adjust Past / Migrated Payable Balance">
+                                    <i class="fa-solid fa-scale-balanced text-amber-600"></i>
+                                    <span>Adjust Bal</span>
+                                </button>
+                                <a href="{{ route('suppliers.show', $s->id) }}" class="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold transition-colors">
+                                    Ledger & Pay &rarr;
+                                </a>
+                                <form method="POST" action="{{ route('suppliers.destroy', $s->id) }}" class="inline"
+                                      onsubmit="confirmDeleteForm(event, '{{ addslashes($s->name) }}', 'Supplier Account')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white transition-colors text-xs cursor-pointer" title="Delete Supplier">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </td>
                     </tr>
                     @empty
@@ -148,13 +174,17 @@
                 </div>
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="block font-semibold text-slate-700 mb-1">Email</label>
-                        <input type="email" name="email" class="w-full px-3 py-2 border rounded-xl">
-                    </div>
-                    <div>
                         <label class="block font-semibold text-slate-700 mb-1">Credit Period (Days) *</label>
                         <input type="number" min="0" name="credit_period_days" value="30" required class="w-full px-3 py-2 border rounded-xl font-mono">
                     </div>
+                    <div>
+                        <label class="block font-semibold text-amber-800 mb-1">Opening / Past Payable (Rs.)</label>
+                        <input type="number" min="0" step="0.01" name="opening_balance" value="0" class="w-full px-3 py-2 border border-amber-300 bg-amber-50/40 rounded-xl font-mono font-bold text-amber-900">
+                    </div>
+                </div>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Email</label>
+                    <input type="email" name="email" class="w-full px-3 py-2 border rounded-xl">
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-700 mb-1">Business Address</label>
@@ -164,6 +194,65 @@
                 <div class="flex justify-end gap-2 pt-3 border-t">
                     <button type="button" @click="addSupplierModal = false" class="px-4 py-2 border rounded-xl text-slate-600">Cancel</button>
                     <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm">Save Supplier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Admin Past / Migrated Supplier Balance Adjustment Modal -->
+    <div x-show="adjustBalanceModal" x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200" @click.outside="adjustBalanceModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-display font-bold text-base text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-scale-balanced text-amber-600"></i>
+                    <span>Adjust Supplier Past / Payable Balance</span>
+                </h3>
+                <button @click="adjustBalanceModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+
+            <form method="POST"
+                  :action="'/suppliers/' + adjustSupplier.id + '/adjust-balance'"
+                  @submit="confirmBalanceAdjustment($event, adjustSupplier.name, 'Supplier')"
+                  class="space-y-3.5 mt-4 text-xs">
+                @csrf
+                <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] font-bold uppercase text-slate-400">Supplier</div>
+                        <div class="font-bold text-sm text-slate-900" x-text="adjustSupplier.name"></div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[10px] font-bold uppercase text-slate-400">Current Payable (AP)</div>
+                        <div class="font-mono font-black text-sm text-rose-600" x-text="'Rs. ' + parseFloat(adjustSupplier.current_balance || 0).toFixed(2)"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Adjustment Type *</label>
+                    <select name="adjustment_mode" required class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800">
+                        <option value="set_exact">Set Exact Payable Balance (e.g. Migrated Opening Balance)</option>
+                        <option value="increase_payable">Add / Increase Past Payable Balance (+)</option>
+                        <option value="decrease_payable">Reduce / Deduct Payable Balance (-)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Amount (Rs.) *</label>
+                    <input type="number" step="0.01" min="0" name="amount" :value="adjustSupplier.current_balance" required
+                           class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Adjustment Reason / Migration Notes *</label>
+                    <input type="text" name="notes" required value="Opening payable balance migrated from previous system"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" @click="adjustBalanceModal = false" class="px-4 py-2 border rounded-xl text-slate-600">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-sm cursor-pointer">
+                        Confirm & Proceed
+                    </button>
                 </div>
             </form>
         </div>

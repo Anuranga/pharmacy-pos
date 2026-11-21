@@ -351,6 +351,11 @@ class POSController extends Controller
                 $amountPaid = (float) ($validated['amount_paid'] ?? 0.0);
                 $balanceDue = 0.0;
 
+                if ($paymentType === 'cash' && ($amountPaid + 0.005) < $grandTotal) {
+                    $shortfall = round($grandTotal - $amountPaid, 2);
+                    throw new Exception("Insufficient Cash Tendered! Total Bill is Rs. " . number_format($grandTotal, 2) . ", but Cash Entered is Rs. " . number_format($amountPaid, 2) . " (Shortfall: Rs. " . number_format($shortfall, 2) . "). Walk-in / Cash sales must pay the full bill amount.");
+                }
+
                 if ($paymentType === 'credit_lending') {
                     if (!$customerId) {
                         throw new Exception("Customer Lending requires selecting a registered customer.");

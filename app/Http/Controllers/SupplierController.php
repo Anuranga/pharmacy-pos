@@ -53,9 +53,18 @@ class SupplierController extends Controller
             'email' => 'nullable|email|max:100',
             'address' => 'nullable|string',
             'credit_period_days' => 'required|integer|min:0',
+            'opening_balance' => 'nullable|numeric|min:0',
         ]);
 
-        $supplier = Supplier::create($validated);
+        $supplier = Supplier::create([
+            'name' => $validated['name'],
+            'contact_person' => $validated['contact_person'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'email' => $validated['email'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'credit_period_days' => $validated['credit_period_days'],
+            'current_balance' => (float) ($validated['opening_balance'] ?? 0),
+        ]);
 
         return redirect()->route('suppliers.index')->with('success', "Supplier '{$supplier->name}' added.");
     }
@@ -131,5 +140,55 @@ class SupplierController extends Controller
         } catch (Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Admin adjustment of supplier payable balance (for migrating past balances or audit corrections).
+     */
+    public function adjustBalance(Request $request, Supplier $supplier)
+    {
+        $validated = $request->validate([
+            'adjustment_mode' => 'required|in:set_exact,increase_payable,decrease_payable',
+            'amount' => 'required|numeric|min:0',
+            'notes' => 'required|string|max:255',
+        ]);
+
+        $prevBalance = (float) $supplier->current_balance;
+        $inputAmount = (float) $validated['amount'];
+
+        if ($validated['adjustment_mode'] === 'set_exact') {
+            $newBalance = max(0.0, $inputAmount);
+        } elseif ($validated['adjustment_mode'] === 'increase_payable') {
+            $newBalance = $prevBalance + $inputAmount;
+        } else {
+            $newBalance = max(0.0, $prevBalance - $inputAmount);
+        }
+
+        $supplier->current_balance = round($newBalance, 2);
+        $supplier->save();
+
+        SupplierPayment::create([
+            'supplier_id' => $supplier->id,
+            'grn_id' => null,
+            'amount_paid' => round($newBalance - $prevBalance, 2),
+            'payment_method' => 'Balance Adjustment',
+            'reference_number' => 'ADJ-' . date('YmdHis'),
+            'payment_date' => now()->toDateString(),
+            'notes' => "[Admin Balance Adjustment: Rs. " . number_format($prevBalance, 2) . " -> Rs. " . number_format($newBalance, 2) . "] " . $validated['notes'],
+            'recorded_by' => Auth::id() ?? 1,
+        ]);
+
+        return back()->with('success', "Supplier '{$supplier->name}' payable balance adjusted from Rs. " . number_format($prevBalance, 2) . " to Rs. " . number_format($newBalance, 2) . ".");
+    }
+
+    /**
+     * Delete supplier account (Admin).
+     */
+    public function destroy(Supplier $supplier)
+    {
+        $name = $supplier->name;
+        $supplier->delete();
+
+        return redirect()->route('suppliers.index')->with('success', "Supplier '{$name}' deleted successfully.");
     }
 }

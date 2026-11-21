@@ -236,6 +236,15 @@ class MasterDataController extends Controller
         return back()->with('success', 'Category updated successfully.');
     }
 
+    public function destroyCategory(Category $category)
+    {
+        $name = $category->name;
+        Product::where('category_id', $category->id)->update(['category_id' => null]);
+        $category->delete();
+
+        return back()->with('success', "Therapeutic Category '{$name}' deleted successfully.");
+    }
+
     /**
      * Quick inline stock & batch price adjustment for Admins with mandatory reason logging.
      */

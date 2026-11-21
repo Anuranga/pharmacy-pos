@@ -196,6 +196,16 @@
                                 <a href="{{ route('master.products.show', $prod->id) }}" class="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600" title="View Batches & Stock Details">
                                     <i class="fa-solid fa-eye text-xs"></i>
                                 </a>
+                                @if(auth()->user()->isAdmin())
+                                <form method="POST" action="{{ route('master.products.destroy', $prod->id) }}" class="inline"
+                                      onsubmit="confirmDeleteForm(event, '{{ addslashes($prod->brand_name) }}', 'Medication Item')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="p-1.5 hover:bg-rose-50 rounded-lg text-rose-500 hover:text-rose-700 transition-colors cursor-pointer" title="Delete Item">
+                                        <i class="fa-solid fa-trash-can text-xs"></i>
+                                    </button>
+                                </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

@@ -51,15 +51,29 @@ class CustomerController extends Controller
      */
     public function store(Request $request)
     {
+        $tenantId = Auth::user()?->tenant_id;
         $validated = $request->validate([
             'name' => 'required|string|max:150',
-            'phone' => 'required|string|max:20|unique:customers,phone',
+            'phone' => [
+                'required',
+                'string',
+                'max:20',
+                \Illuminate\Validation\Rule::unique('customers', 'phone')->where(fn($q) => $q->where('tenant_id', $tenantId)),
+            ],
             'nic_number' => 'nullable|string|max:30',
             'credit_limit' => 'required|numeric|min:0',
+            'opening_debt_balance' => 'nullable|numeric|min:0',
             'address' => 'nullable|string',
         ]);
 
-        $customer = Customer::create($validated);
+        $customer = Customer::create([
+            'name' => $validated['name'],
+            'phone' => $validated['phone'],
+            'nic_number' => $validated['nic_number'] ?? null,
+            'credit_limit' => $validated['credit_limit'],
+            'current_debt_balance' => (float) ($validated['opening_debt_balance'] ?? 0),
+            'address' => $validated['address'] ?? null,
+        ]);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -196,5 +210,53 @@ class CustomerController extends Controller
         } catch (Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    /**
+     * Admin adjustment of customer debt balance (for migrating past balances or manual audit corrections).
+     */
+    public function adjustBalance(Request $request, Customer $customer)
+    {
+        $validated = $request->validate([
+            'adjustment_mode' => 'required|in:set_exact,increase_debt,decrease_debt',
+            'amount' => 'required|numeric|min:0',
+            'notes' => 'required|string|max:255',
+        ]);
+
+        $prevBalance = (float) $customer->current_debt_balance;
+        $inputAmount = (float) $validated['amount'];
+
+        if ($validated['adjustment_mode'] === 'set_exact') {
+            $newBalance = max(0.0, $inputAmount);
+        } elseif ($validated['adjustment_mode'] === 'increase_debt') {
+            $newBalance = $prevBalance + $inputAmount;
+        } else {
+            $newBalance = max(0.0, $prevBalance - $inputAmount);
+        }
+
+        $customer->current_debt_balance = round($newBalance, 2);
+        $customer->save();
+
+        CustomerSettlement::create([
+            'customer_id' => $customer->id,
+            'amount_received' => round($newBalance - $prevBalance, 2),
+            'payment_method' => 'Balance Adjustment',
+            'notes' => "[Admin Balance Adjustment: Rs. " . number_format($prevBalance, 2) . " -> Rs. " . number_format($newBalance, 2) . "] " . $validated['notes'],
+            'received_by' => Auth::id() ?? 1,
+            'date' => now(),
+        ]);
+
+        return back()->with('success', "Customer '{$customer->name}' debt balance adjusted from Rs. " . number_format($prevBalance, 2) . " to Rs. " . number_format($newBalance, 2) . ".");
+    }
+
+    /**
+     * Delete customer account (Admin).
+     */
+    public function destroy(Customer $customer)
+    {
+        $name = $customer->name;
+        $customer->delete();
+
+        return redirect()->route('customers.index')->with('success', "Customer '{$name}' deleted successfully.");
     }
 }

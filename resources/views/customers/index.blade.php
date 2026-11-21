@@ -7,6 +7,8 @@
      x-data="{ 
         addCustomerModal: false, 
         editCustomerModal: false,
+        adjustBalanceModal: false,
+        adjustCustomer: { id: '', name: '', current_debt: 0 },
         editForm: {
             id: '',
             name: '',
@@ -25,6 +27,14 @@
                 address: customer.address || ''
             };
             this.editCustomerModal = true;
+        },
+        openAdjustModal(customer) {
+            this.adjustCustomer = {
+                id: customer.id,
+                name: customer.name,
+                current_debt: customer.current_debt
+            };
+            this.adjustBalanceModal = true;
         }
      }">
     
@@ -146,9 +156,18 @@
                         </td>
                         <td class="py-3 px-4 text-right">
                             <div class="flex items-center justify-end gap-1.5">
+                                @if(auth()->user()->isAdmin())
+                                <button type="button"
+                                        @click="openAdjustModal({ id: {{ $c->id }}, name: @js($c->name), current_debt: {{ (float) $c->current_debt_balance }} })"
+                                        class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                        title="Adjust Past / Migrated Debt Balance">
+                                    <i class="fa-solid fa-scale-balanced text-amber-600"></i>
+                                    <span>Adjust Bal</span>
+                                </button>
+                                @endif
                                 <button type="button" 
                                         @click="openEditModal({ id: {{ $c->id }}, name: @js($c->name), phone: @js($c->phone), nic_number: @js($c->nic_number), credit_limit: {{ (float)$c->credit_limit }}, address: @js($c->address) })"
-                                        class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors" 
+                                        class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer" 
                                         title="Edit Customer Details">
                                     <i class="fa-solid fa-pen-to-square text-emerald-600"></i>
                                     <span>Edit</span>
@@ -157,6 +176,16 @@
                                    class="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold transition-colors">
                                     Ledger &rarr;
                                 </a>
+                                @if(auth()->user()->isAdmin())
+                                <form method="POST" action="{{ route('customers.destroy', $c->id) }}" class="inline"
+                                      onsubmit="confirmDeleteForm(event, '{{ addslashes($c->name) }}', 'Customer Account')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white transition-colors text-xs cursor-pointer" title="Delete Customer">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -204,10 +233,15 @@
                         <input type="text" name="nic_number" placeholder="e.g. 1985..." class="w-full px-3 py-2 border rounded-xl font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                     </div>
                 </div>
-                <div>
-                    <label class="block font-semibold text-slate-700 mb-1">Approved Credit Limit (Rs.) *</label>
-                    <input type="number" min="0" step="100" name="credit_limit" value="15000" required class="w-full px-3 py-2 border rounded-xl font-mono font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                    <span class="text-[10px] text-slate-400 mt-0.5 block">Maximum amount customer is allowed to borrow on tab.</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Approved Credit Limit (Rs.) *</label>
+                        <input type="number" min="0" step="100" name="credit_limit" value="15000" required class="w-full px-3 py-2 border rounded-xl font-mono font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-amber-800 mb-1">Opening / Past Debt (Rs.)</label>
+                        <input type="number" min="0" step="0.01" name="opening_debt_balance" value="0" class="w-full px-3 py-2 border border-amber-300 bg-amber-50/40 rounded-xl font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+                    </div>
                 </div>
                 <div>
                     <label class="block font-semibold text-slate-700 mb-1">Residential Address</label>
@@ -266,6 +300,66 @@
                     <button type="button" @click="editCustomerModal = false" class="px-4 py-2 border rounded-xl text-slate-600 hover:bg-slate-50 font-medium">Cancel</button>
                     <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-sm">
                         Update Customer Details
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: Admin Past / Migrated Customer Balance Adjustment Modal -->
+    <div x-show="adjustBalanceModal" x-cloak
+         class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200" @click.outside="adjustBalanceModal = false">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <h3 class="font-display font-bold text-base text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-scale-balanced text-amber-600"></i>
+                    <span>Adjust Customer Past / Debt Balance</span>
+                </h3>
+                <button @click="adjustBalanceModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+
+            <form method="POST"
+                  :action="'/customers/' + adjustCustomer.id + '/adjust-balance'"
+                  @submit="confirmBalanceAdjustment($event, adjustCustomer.name, 'Customer')"
+                  class="space-y-3.5 mt-4 text-xs">
+                @csrf
+                <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] font-bold uppercase text-slate-400">Customer</div>
+                        <div class="font-bold text-sm text-slate-900" x-text="adjustCustomer.name"></div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[10px] font-bold uppercase text-slate-400">Current Debt</div>
+                        <div class="font-mono font-black text-sm text-rose-600" x-text="'Rs. ' + parseFloat(adjustCustomer.current_debt || 0).toFixed(2)"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Adjustment Type *</label>
+                    <select name="adjustment_mode" required class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-slate-800">
+                        <option value="set_exact">Set Exact Debt Balance (e.g. Migrated Opening Balance)</option>
+                        <option value="increase_debt">Add / Increase Past Debt Balance (+)</option>
+                        <option value="decrease_debt">Reduce / Deduct Debt Balance (-)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Amount (Rs.) *</label>
+                    <input type="number" step="0.01" min="0" name="amount" :value="adjustCustomer.current_debt" required
+                           class="w-full px-3 py-2 border border-slate-300 rounded-xl font-mono text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Adjustment Reason / Migration Notes *</label>
+                    <input type="text" name="notes" required value="Opening balance migrated from previous system"
+                           placeholder="e.g. Opening balance migrated from old system..."
+                           class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" @click="adjustBalanceModal = false" class="px-4 py-2 border rounded-xl text-slate-600">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-sm cursor-pointer">
+                        Confirm & Proceed
                     </button>
                 </div>
             </form>
